@@ -1,0 +1,21 @@
+{
+  "prilohy": [
+    {
+      "id": 9020201,
+      "pocetStran": 0,
+      "jazyk": "SK",
+      "velkostPrilohy": 2068366,
+      "meno": "Účtovná závierka IFRS.PDF",
+      "mimeType": "application/pdf",
+      "digest": "77e4dacd8919526dbef3a201f5cb09dc4a4f9dbcbf89c0c9313f2ca348db0085"
+    }
+  ],
+  "id": 9020001,
+  "idUctovnejZavierky": 9020101,
+  "obsah": {},
+  "pristupnostDat": "Verejné prílohy",
+  "idSablony": 709,
+  "kodDanovehoUradu": "900",
+  "datumPoslednejUpravy": "2026-07-05",
+  "zdrojDat": "FRSR"
+}

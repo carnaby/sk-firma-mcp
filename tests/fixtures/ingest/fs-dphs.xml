@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ZoznamDPHS>
+  <DatumAktualizacieZoznamu>12072026</DatumAktualizacieZoznamu>
+  <DS_DPHS>
+    <ITEM>
+      <IC_DPH>SK7077777777</IC_DPH>
+      <ICO>77777777</ICO>
+      <NAZOV_DS>Firma Sedem s. r. o.</NAZOV_DS>
+      <OBEC>Bratislava - mestská časť Ružinov</OBEC>
+      <PSC>82101</PSC>
+      <ULICA_CISLO>Vzorová 123/4</ULICA_CISLO>
+      <STAT>Slovensko</STAT>
+      <DRUH_REG_DPH>§4</DRUH_REG_DPH>
+      <DATUM_REG>11.10.2020</DATUM_REG>
+      <PLAT_DPH_OD>11.10.2020</PLAT_DPH_OD>
+    </ITEM>
+    <ITEM>
+      <IC_DPH>SK7088888888</IC_DPH>
+      <ICO>88888888</ICO>
+      <NAZOV_DS>Firma Osem a. s.</NAZOV_DS>
+      <OBEC>Košice</OBEC>
+      <PSC>04001</PSC>
+      <DRUH_REG_DPH>§7a</DRUH_REG_DPH>
+      <DATUM_REG>05.03.2023</DATUM_REG>
+    </ITEM>
+  </DS_DPHS>
+</ZoznamDPHS>

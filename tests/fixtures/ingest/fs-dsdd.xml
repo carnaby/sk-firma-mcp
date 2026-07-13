@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ZoznamDSDD>
+  <DatumAktualizacieZoznamu>31052026</DatumAktualizacieZoznamu>
+  <DS_DSDD>
+    <ITEM>
+      <NAZOV_SUBJEKTU>&quot;Firma Sedem s. r. o.&quot;</NAZOV_SUBJEKTU>
+      <CIASTKA>780.00</CIASTKA>
+      <ULICA_CISLO>Vzorová 123/4</ULICA_CISLO>
+      <PSC>82101</PSC>
+      <OBEC>Bratislava - mestská časť Ružinov</OBEC>
+    </ITEM>
+    <ITEM>
+      <NAZOV_SUBJEKTU>Firma Deväť s. r. o. v likvidácii</NAZOV_SUBJEKTU>
+      <CIASTKA>12 345,67</CIASTKA>
+      <PSC>04001</PSC>
+      <OBEC>Košice</OBEC>
+    </ITEM>
+  </DS_DSDD>
+</ZoznamDSDD>

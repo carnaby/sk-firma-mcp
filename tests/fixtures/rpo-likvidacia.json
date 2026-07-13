@@ -1,0 +1,17 @@
+{
+  "id": 100,
+  "dbModificationDate": "2025-07-07",
+  "identifiers": [{ "value": "55555555", "validFrom": "2018-01-02" }],
+  "fullNames": [{ "value": "Firma Päť s. r. o. v likvidácii", "validFrom": "2018-01-02" }],
+  "legalForms": [{ "value": { "value": "Spoločnosť s ručením obmedzeným", "code": "112", "codelistCode": "CL000056" }, "validFrom": "2018-01-02" }],
+  "establishment": "1994-11-15",
+  "addresses": [
+    { "validFrom": "2022-03-04", "street": "Vzorová", "buildingNumber": "123/4", "postalCodes": ["81101"], "municipality": { "value": "Bratislava - mestská časť Staré Mesto" } },
+    { "validFrom": "2018-01-02", "validTo": "2022-03-03", "street": "Stará ulica", "buildingNumber": "1", "postalCodes": ["81101"], "municipality": { "value": "Bratislava" } }
+  ],
+  "statutoryBodies": [{ "stakeholderType": { "value": "Konateľ", "code": "3" }, "validFrom": "2018-01-02", "personName": { "formatedName": "Ing. Ján Vzorový" }, "address": { "street": "BYDLISKO-NEVYSTAVOVAT" } }],
+  "stakeholders": [{ "stakeholderType": { "value": "Spoločník v.o.s. / s.r.o.", "code": "99" }, "validFrom": "2023-09-15", "personName": { "formatedName": "Ing. Ján Vzorový" } }],
+  "statisticalCodes": { "mainActivity": { "value": "Počítačové programovanie", "code": "6210" } },
+  "sourceRegister": { "value": { "value": "Obchodný register", "code": "1" } },
+  "legalStatuses": [{ "value": { "value": "V likvidácii", "code": "2", "codelistCode": "CL010108" }, "validFrom": "2005-06-07" }]
+}

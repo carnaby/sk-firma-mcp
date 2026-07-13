@@ -1,0 +1,39 @@
+{
+  "name": "sk-firma-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server: previerka slovenskej firmy podľa IČO/názvu (RPO, RÚZ + risk engine)",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "sk-firma-mcp-server": "dist/index.js",
+    "sk-firma-mcp-ingest": "dist/ingest/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "node scripts/smoke.mjs",
+    "ingest": "node dist/ingest/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^12.11.1",
+    "fflate": "^0.8.3",
+    "undici": "^8.7.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

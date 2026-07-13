@@ -1,0 +1,2 @@
+# Fixtures sa nesmú konvertovať (CRLF by rozbil parsery citlivé na \n a BOM/TAB bajty)
+tests/fixtures/** -text

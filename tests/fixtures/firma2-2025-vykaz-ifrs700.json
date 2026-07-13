@@ -1,0 +1,21 @@
+{
+  "prilohy": [
+    {
+      "id": 9010401,
+      "pocetStran": 0,
+      "jazyk": "SK",
+      "velkostPrilohy": 1181713,
+      "meno": "Správa audítora.PDF",
+      "mimeType": "application/pdf",
+      "digest": "b91cdfe542f7b0fabdcfc7b3ba75e878f8f664db4efe9acd63cac60ac5425076"
+    }
+  ],
+  "id": 9010002,
+  "idUctovnejZavierky": 9010101,
+  "obsah": {},
+  "pristupnostDat": "Verejné",
+  "idSablony": 700,
+  "kodDanovehoUradu": "900",
+  "datumPoslednejUpravy": "2026-01-15",
+  "zdrojDat": "FRSR"
+}
