@@ -43,12 +43,11 @@ export class RpoClient {
 
   private async api(pathAndQuery: string, timeoutMs: number): Promise<unknown> {
     const url = `${CONFIG.rpo.baseUrl}${pathAndQuery}`;
-    const hit = this.cache.get(`rpo:${url}`);
-    if (hit !== undefined) return hit;
-    const data = (await fetchJson(url, { timeoutMs })) as Record<string, unknown>;
-    delete data.license; // ~1 kB CC-BY textu v každej odpovedi (S1) — atribúciu robí render vrstva
-    this.cache.set(`rpo:${url}`, data, CONFIG.rpo.cacheTtlMs);
-    return data;
+    return this.cache.getOrLoad(`rpo:${url}`, CONFIG.rpo.cacheTtlMs, async () => {
+      const data = (await fetchJson(url, { timeoutMs })) as Record<string, unknown>;
+      delete data.license; // ~1 kB CC-BY textu v každej odpovedi (S1) — atribúciu robí render vrstva
+      return data;
+    });
   }
 
   async searchByIco(ico: string): Promise<SearchCandidate | null> {

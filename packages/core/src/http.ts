@@ -1,23 +1,11 @@
 import { fetch } from 'undici';
 import { CONFIG } from './config.js';
+import { acquireUpstreamSlot } from './upstream.js';
 
 export class HttpError extends Error {
   constructor(message: string, public status?: number) {
     super(message);
   }
-}
-
-// Serializácia per host: rate limity RPO/RÚZ sú nedokumentované (S1/S2),
-// preto max ~2 req/s a žiadne súbežné dopyty na ten istý host.
-const hostQueues = new Map<string, Promise<void>>();
-
-async function throttle(host: string): Promise<void> {
-  const prev = hostQueues.get(host) ?? Promise.resolve();
-  let release!: () => void;
-  const next = new Promise<void>((r) => (release = r));
-  hostQueues.set(host, next);
-  await prev;
-  setTimeout(release, CONFIG.http.minIntervalMs);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -31,12 +19,12 @@ export async function fetchJson(
   let lastError: unknown;
   for (let attempt = 0; attempt <= CONFIG.http.maxRetries; attempt++) {
     if (attempt > 0) await sleep(CONFIG.http.backoffBaseMs * 2 ** (attempt - 1));
-    await throttle(host);
+    await acquireUpstreamSlot(host); // BusyError sa neretryuje — letí rovno von
     let res;
     try {
       res = await fetch(url, {
         signal: AbortSignal.timeout(timeoutMs),
-        headers: { accept: 'application/json', 'user-agent': 'sk-firma-mcp-server/0.1' },
+        headers: { accept: 'application/json', 'user-agent': 'sk-firma-mcp-server/0.2 (+https://github.com/carnaby/sk-firma-mcp)' },
       });
     } catch (e) {
       lastError = e; // timeout / sieťová chyba → ďalší pokus (plánom vyžadované)

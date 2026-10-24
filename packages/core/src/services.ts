@@ -2,7 +2,7 @@
 // Vracia štruktúrované dáta, nerenderuje. Volá ju MCP server aj webové API,
 // takže pravidlá (validácia, GDPR, verdikt) existujú na jednom mieste.
 import { CONFIG } from './config.js';
-import { ToolError, validateIco } from './errors.js';
+import { BusyError, ToolError, validateIco } from './errors.js';
 import { mapEntityToProfile } from './domain/profile.js';
 import { evaluateRisk, type RiskResult } from './domain/risk.js';
 import { fetchDebts } from './domain/debts.js';
@@ -203,6 +203,11 @@ export async function checkCompany(
 
   // Nenájdené IČO je chyba celého use-casu, nie zlyhaná sekcia:
   if (profileRes.status === 'rejected' && profileRes.reason instanceof ToolError) throw profileRes.reason;
+  // Vyťažený server (ochrana zdrojov) nie je „zdroj nedostupný" — inak by
+  // previerka vrátila zavádzajúci 🟠 verdikt s dierami namiesto „skús neskôr".
+  for (const r of [finRes, debtsRes, vatRes]) {
+    if (r.status === 'rejected' && r.reason instanceof BusyError) throw r.reason;
+  }
 
   const profile = profileRes.status === 'fulfilled' ? profileRes.value : null;
   const financials = finRes.status === 'fulfilled' ? finRes.value : null;

@@ -3,6 +3,13 @@
 // zdrojov (stack, URL) do hlášky nepatria.
 export class ToolError extends Error {}
 
+/** Náš server odmieta dopyt, aby nezahltil zdrojové API (fronta plná / denný limit). */
+export class BusyError extends ToolError {
+  constructor(message: string, public retryAfterSec: number) {
+    super(message);
+  }
+}
+
 export function validateIco(input: string): string {
   const ico = input.replace(/\s+/g, '');
   if (/^\d{8}$/.test(ico)) return ico;

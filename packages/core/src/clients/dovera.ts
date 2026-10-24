@@ -4,6 +4,7 @@
 import { fetch } from 'undici';
 import { CONFIG } from '../config.js';
 import type { LruCache } from '../cache.js';
+import { acquireUpstreamSlot } from '../upstream.js';
 
 export type DoveraResult =
   | { status: 'debtor'; amount_eur: number; as_of: string | null }
@@ -38,22 +39,21 @@ export class DoveraClient {
     if (!CONFIG.dovera.enabled) {
       return { status: 'unavailable', note: 'Dôvera lookup je vypnutý (SKFIRMA_DOVERA=0).' };
     }
-    const cached = this.cache.get(`dovera:${ico}`) as DoveraResult | undefined;
-    if (cached) return cached;
-    try {
-      const res = await fetch(`${CONFIG.dovera.searchUrl}${encodeURIComponent(ico)}`, {
-        headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) sk-firma-mcp' },
-        signal: AbortSignal.timeout(CONFIG.dovera.timeoutMs),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const result = parseDoveraHtml(await res.text(), ico);
-      if (result.status !== 'unavailable') {
-        this.cache.set(`dovera:${ico}`, result, CONFIG.dovera.cacheTtlMs);
+    const url = `${CONFIG.dovera.searchUrl}${encodeURIComponent(ico)}`;
+    return (await this.cache.getOrLoad(`dovera:${ico}`, CONFIG.dovera.cacheTtlMs, async () => {
+      try {
+        await acquireUpstreamSlot(new URL(url).host);
+        const res = await fetch(url, {
+          headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) sk-firma-mcp' },
+          signal: AbortSignal.timeout(CONFIG.dovera.timeoutMs),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return parseDoveraHtml(await res.text(), ico);
+      } catch (e) {
+        // Dôvera je doplnkový zdroj — vyťaženie/výpadok degraduje na unavailable, nezhodí previerku
+        console.error('[dovera] lookup zlyhal:', e instanceof Error ? e.message : e);
+        return { status: 'unavailable', note: 'Dôvera vyhľadávanie momentálne nedostupné.' } satisfies DoveraResult;
       }
-      return result;
-    } catch (e) {
-      console.error('[dovera] lookup zlyhal:', e);
-      return { status: 'unavailable', note: 'Dôvera vyhľadávanie momentálne nedostupné.' };
-    }
+    }, (r) => (r as DoveraResult).status !== 'unavailable')) as DoveraResult;
   }
 }

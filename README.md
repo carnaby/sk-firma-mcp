@@ -65,30 +65,87 @@ npm run typecheck
 
 ### Produkcia (Docker, hocikde s perzistentným diskom)
 
+Hotový image pre `linux/amd64` aj `linux/arm64` builduje GitHub Actions
+pri každom pushi do `main` → `ghcr.io/carnaby/sk-firma-mcp:latest`.
+
 ```bash
-docker build -t skfirma .
-docker run -p 8080:8080 -v skfirma-data:/data skfirma
+docker run -d -p 8080:8080 -v skfirma-data:/data ghcr.io/carnaby/sk-firma-mcp:latest
+# alebo lokálny build: docker build -t skfirma .
 ```
 
 Kontajner pri štarte postaví index, ak chýba alebo je starší ako
 interval, a potom ho obnovuje každých `SKFIRMA_INGEST_INTERVAL_HOURS`.
 Ingest beží v child procese, aby parsovanie ~100 MB dát neblokovalo API.
-Funguje to na VPS, Fly.io, Railway aj Render, ak má služba **volume**
+Funguje to na NAS, VPS, Fly.io aj Railway, ak má služba **volume**
 pripojený na `/data`. Serverless (Vercel, Netlify, Cloudflare) nepôjde:
 SQLite index potrebuje disk a dlhožijúci proces.
+
+### Nasadenie na NAS (Docker Compose + Cloudflare Tunnel)
+
+Konektor v claude.ai volajú servery Anthropicu, takže server musí byť
+dostupný **z internetu cez HTTPS**. Cloudflare Tunnel to vyrieši bez
+otvárania portov na routeri, bez verejnej IP a s automatickým TLS.
+Potrebuješ doménu spravovanú v Cloudflare (stačí free plán).
+
+1. **Image na GHCR.** Po prvom pushi do `main` počkaj, kým dobehne
+   workflow *Docker image* (záložka Actions). Potom na GitHube otvor
+   Packages → `sk-firma-mcp` → Package settings → Change visibility →
+   **Public**, aby si ho NAS stiahol bez prihlasovania.
+2. **Tunel.** Cloudflare dashboard → Zero Trust → Networks → Tunnels →
+   *Create a tunnel* → Cloudflared → pomenuj ho → skopíruj **token**
+   (dlhý reťazec za `--token`). V tom istom tuneli pridaj *Public
+   hostname*: napr. `skfirma.tvojadomena.sk`, Service `HTTP`, URL
+   `skfirma:8080` (názov služby z compose, nie localhost).
+3. **Compose.** Skopíruj [`deploy/compose.yaml`](deploy/compose.yaml) na
+   NAS a do `TUNNEL_TOKEN` vlož token.
+   - *Synology (DSM 7.2+):* Container Manager → Projekt → Vytvoriť →
+     zvoľ priečinok (napr. `/docker/skfirma`) → „Vytvoriť docker-compose.yml"
+     → vlož obsah → Ďalej → Hotovo.
+   - *QNAP:* Container Station → Applications → Create → vlož YAML.
+   - *Hocičo s SSH:* `docker compose -f compose.yaml up -d`
+4. **Over.** `https://skfirma.tvojadomena.sk/api/health` — prvý ingest
+   beží ~5 s po štarte a trvá pár minút; potom `index_available: true`.
+5. **Konektor.** claude.ai → Nastavenia → Connectors → Add custom
+   connector → `https://skfirma.tvojadomena.sk/mcp`.
+
+**Update:** po novom pushi do `main` v Container Manageri projekt
+*Zastaviť → Vyčistiť → Zostaviť* (stiahne nový `latest`), alebo cez SSH
+`docker compose pull && docker compose up -d`. Index vo volume ostáva.
+
+Bez domény v Cloudflare: alternatívou je Tailscale Funnel (verejná HTTPS
+adresa `*.ts.net`). Vtedy zmaž blok `cloudflared` a nastav
+`TRUST_PROXY: xff`.
+
+### Ochrana zdrojových API
+
+Verejný web a `/mcp` znamenajú, že ktokoľvek môže cez tvoj server
+posielať dopyty na RPO, RÚZ a Dôveru. Ochrana má dve úrovne:
+
+| Vrstva | Chráni pred | Default |
+|---|---|---|
+| Limit na IP — minúta | jedným klientom, ktorý klikne 100× | API 20/min, MCP 60/min |
+| Limit na IP — deň | crawlerom z jednej adresy | API 300/deň, MCP 1 500/deň |
+| Cache + single-flight | opakovaným a súbežným dopytom na tú istú firmu | RPO 7 dní, RÚZ a Dôvera 1 deň |
+| Throttle na host | nárazom | ~2 req/s na RPO, RÚZ, Dôveru |
+| Max. fronta na host | zahlteniu (veľa IP naraz) | 20 čakajúcich, ďalší dostane hneď „vyťažené" (HTTP 503) |
+| Denný rozpočet na host | súčtu všetkých klientov | 20 000 dopytov/deň na zdroj |
+
+Aktuálne čísla (spotreba rozpočtu, fronta, odmietnuté) ukazuje
+`/api/health` → `upstream`. Limity sú v pamäti procesu: reštart ich
+vynuluje a pri viacerých inštanciách by ich bolo treba zdieľať (Redis).
 
 | Premenná | Default | |
 |---|---|---|
 | `PORT` | `8080` (Docker), `8787` (lokálne) | |
 | `SKFIRMA_INDEX_PATH` | `/data/skfirma-index.sqlite` (Docker) | cesta k SQLite indexu |
 | `SKFIRMA_INGEST_INTERVAL_HOURS` | `24` | `0` = vypnutý plánovaný ingest |
-| `RATE_LIMIT_PER_MINUTE` | `30` | na IP pre `/api`, dvojnásobok pre `/mcp` |
-| `TRUST_PROXY` | `1` (Docker) | IP klienta z `X-Forwarded-For` (za reverse proxy) |
+| `TRUST_PROXY` | `none` | `cloudflare` = IP z `CF-Connecting-IP`; `xff` = posledná položka `X-Forwarded-For` (vlastná reverse proxy) |
+| `RATE_LIMIT_API_PER_MINUTE` / `_PER_DAY` | `20` / `300` | na IP pre `/api/check` a `/api/search` |
+| `RATE_LIMIT_MCP_PER_MINUTE` / `_PER_DAY` | `60` / `1500` | na IP pre `/mcp` (jedno použitie nástroja = 2–4 volania) |
+| `SKFIRMA_UPSTREAM_MAX_QUEUE` | `20` | max. čakajúcich dopytov na jeden zdroj |
+| `SKFIRMA_UPSTREAM_DAILY_BUDGET` | `20000` | max. dopytov na jeden zdroj za deň (UTC) |
 | `WEB_DIR` | `apps/web/dist` | build webu |
 | `SKFIRMA_DOVERA` | — | `0` vypne live lookup na Dôveru |
-
-Rate limit je v pamäti procesu, čo stačí pre jednu inštanciu. Chráni
-verejné štátne API pred tým, aby ich niekto cez tvoj server zahltil.
 
 ## Ingest (lokálny index dlžníkov a platiteľov DPH)
 
