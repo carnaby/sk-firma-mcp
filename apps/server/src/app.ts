@@ -96,7 +96,7 @@ export function createApp(opts: AppOptions): Hono {
       const m = deps.index.meta(d);
       return { dataset: d, as_of: m?.as_of ?? null, records: m?.record_count ?? null };
     });
-    return c.json({ ok: true, version: SERVER_INFO.version, index_available: deps.index.available(), index, upstream: upstreamStats(), limits: L });
+    return c.json({ ok: true, version: SERVER_INFO.version, index_available: deps.index.available(), index, upstream: upstreamStats(), limits: L, client_ip: clientIp(c) });
   });
 
   app.get('/api/check', async (c) => {

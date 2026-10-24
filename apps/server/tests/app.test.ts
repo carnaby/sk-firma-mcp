@@ -121,6 +121,7 @@ describe('HTTP API', () => {
     const body = (await (await get(createApp({ deps: deps() }), '/api/health')).json()) as Record<string, unknown>;
     expect(body).toHaveProperty('upstream');
     expect(body).toHaveProperty('limits');
+    expect(body).toHaveProperty('client_ip');
   });
 });
 

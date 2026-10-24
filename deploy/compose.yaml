@@ -1,9 +1,8 @@
-# SK Firma na NAS / domácom serveri.
+# SK Firma na Synology NAS za DSM reverse proxy (bez Cloudflare Tunnel).
+# Postup: README → „Nasadenie na Synology (DSM reverse proxy)".
 #
-# Pred prvým spustením vlož do TUNNEL_TOKEN token z Cloudflare
-# (postup v README → „Nasadenie na NAS"). Bez tunela beží web len v LAN
-# na http://<ip-nas>:8080 — vtedy blok `cloudflared` zmaž a TRUST_PROXY
-# nastav na "none".
+# Tok: internet → router :443 → DSM reverse proxy (HTTPS, Let's Encrypt)
+#      → http://localhost:8080 → tento kontajner
 
 services:
   skfirma:
@@ -11,16 +10,18 @@ services:
     container_name: skfirma
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      # len na localhost NAS-u: dnu sa ide výhradne cez DSM reverse proxy.
+      # Na 0.0.0.0 by sa dal z LAN obísť proxy aj podvrhnúť X-Forwarded-For.
+      - "127.0.0.1:8080:8080"
     volumes:
       # pomenovaný volume, nie ./data — Docker mu nastaví správneho vlastníka
-      # (kontajner beží ako neprivilegovaný user), na NAS by bind mount
+      # (kontajner beží ako neprivilegovaný user), bind mount na DSM by
       # skončil s „permission denied" pri ingeste
       - skfirma-data:/data
     environment:
       TZ: Europe/Bratislava
-      # IP klienta pre limity berieme z hlavičky CF-Connecting-IP
-      TRUST_PROXY: cloudflare
+      # DSM reverse proxy (nginx) pridáva IP klienta na koniec X-Forwarded-For
+      TRUST_PROXY: xff
       # Limity — defaulty sú rozumné, odkomentuj len ak treba
       # RATE_LIMIT_API_PER_MINUTE: "20"
       # RATE_LIMIT_API_PER_DAY: "300"
@@ -28,16 +29,6 @@ services:
       # RATE_LIMIT_MCP_PER_DAY: "1500"
       # SKFIRMA_UPSTREAM_DAILY_BUDGET: "20000"
       # SKFIRMA_UPSTREAM_MAX_QUEUE: "20"
-
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: skfirma-tunnel
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: "SEM-VLOZ-TOKEN-Z-CLOUDFLARE"
-    depends_on:
-      - skfirma
 
 volumes:
   skfirma-data:

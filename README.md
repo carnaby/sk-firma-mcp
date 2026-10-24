@@ -80,41 +80,61 @@ Funguje to na NAS, VPS, Fly.io aj Railway, ak má služba **volume**
 pripojený na `/data`. Serverless (Vercel, Netlify, Cloudflare) nepôjde:
 SQLite index potrebuje disk a dlhožijúci proces.
 
-### Nasadenie na NAS (Docker Compose + Cloudflare Tunnel)
+### Nasadenie na Synology (DSM reverse proxy)
 
 Konektor v claude.ai volajú servery Anthropicu, takže server musí byť
-dostupný **z internetu cez HTTPS**. Cloudflare Tunnel to vyrieši bez
-otvárania portov na routeri, bez verejnej IP a s automatickým TLS.
-Potrebuješ doménu spravovanú v Cloudflare (stačí free plán).
+dostupný **z internetu cez HTTPS**. Na Synology to zvládne vstavaná
+reverse proxy s certifikátom Let's Encrypt; kontajner je dostupný len na
+localhoste NAS-u.
 
-1. **Image na GHCR.** Po prvom pushi do `main` počkaj, kým dobehne
-   workflow *Docker image* (záložka Actions). Potom na GitHube otvor
-   Packages → `sk-firma-mcp` → Package settings → Change visibility →
-   **Public**, aby si ho NAS stiahol bez prihlasovania.
-2. **Tunel.** Cloudflare dashboard → Zero Trust → Networks → Tunnels →
-   *Create a tunnel* → Cloudflared → pomenuj ho → skopíruj **token**
-   (dlhý reťazec za `--token`). V tom istom tuneli pridaj *Public
-   hostname*: napr. `skfirma.tvojadomena.sk`, Service `HTTP`, URL
-   `skfirma:8080` (názov služby z compose, nie localhost).
-3. **Compose.** Skopíruj [`deploy/compose.yaml`](deploy/compose.yaml) na
-   NAS a do `TUNNEL_TOKEN` vlož token.
-   - *Synology (DSM 7.2+):* Container Manager → Projekt → Vytvoriť →
-     zvoľ priečinok (napr. `/docker/skfirma`) → „Vytvoriť docker-compose.yml"
-     → vlož obsah → Ďalej → Hotovo.
-   - *QNAP:* Container Station → Applications → Create → vlož YAML.
-   - *Hocičo s SSH:* `docker compose -f compose.yaml up -d`
-4. **Over.** `https://skfirma.tvojadomena.sk/api/health` — prvý ingest
-   beží ~5 s po štarte a trvá pár minút; potom `index_available: true`.
-5. **Konektor.** claude.ai → Nastavenia → Connectors → Add custom
+```
+internet → router :443 → DSM reverse proxy (HTTPS) → localhost:8080 → kontajner
+```
+
+**Predpoklady:** DSM 7.2+ s Container Managerom, port 443 (a 80 pre
+vydanie certifikátu) presmerovaný z routera na NAS, DNS záznam
+subdomény (napr. `skfirma.tvojadomena.sk`, A/CNAME) mieri na tvoju
+verejnú IP.
+
+1. **Image na GHCR.** Po merge do `main` počkaj, kým dobehne workflow
+   *Docker image* (GitHub → Actions). Potom Packages → `sk-firma-mcp` →
+   Package settings → Change visibility → **Public**, aby si ho NAS
+   stiahol bez prihlasovania. Stačí raz.
+2. **Kontajner.** Container Manager → Projekt → Vytvoriť → názov
+   `skfirma`, cesta napr. `/docker/skfirma` → Zdroj: „Vytvoriť
+   docker-compose.yml" → vlož obsah [`deploy/compose.yaml`](deploy/compose.yaml)
+   → Ďalej (Web Station portál nezapínaj) → Hotovo.
+3. **Certifikát.** Ovládací panel → Zabezpečenie → Certifikát → Pridať
+   → Získať certifikát od Let's Encrypt → doména `skfirma.tvojadomena.sk`.
+   Ak už máš wildcard certifikát na doménu, tento krok preskoč.
+4. **Reverse proxy.** Ovládací panel → Prihlasovací portál → Rozšírené
+   → Reverzný server proxy → Vytvoriť:
+   - Zdroj: HTTPS, názov hostiteľa `skfirma.tvojadomena.sk`, port 443,
+     zapni HSTS
+   - Cieľ: HTTP, `localhost`, port `8080`
+   - Potom v Zabezpečenie → Certifikát → Nastavenia priraď tejto
+     službe certifikát z kroku 3.
+5. **Over.** `https://skfirma.tvojadomena.sk/api/health`. Prvý ingest
+   štartuje ~5 s po spustení a trvá pár minút; potom `index_available: true`.
+   Logy: Container Manager → Kontajner → `skfirma` → Denník.
+   **Skontroluj `client_ip`** — musí to byť tvoja verejná IP. Ak je tam
+   `172.x.x.x` (adresa proxy), limity by platili pre všetkých naraz: v
+   pravidle reverse proxy → Vlastná hlavička → Vytvoriť pridaj
+   `X-Forwarded-For` = `$proxy_add_x_forwarded_for`.
+6. **Konektor.** claude.ai → Nastavenia → Connectors → Add custom
    connector → `https://skfirma.tvojadomena.sk/mcp`.
 
-**Update:** po novom pushi do `main` v Container Manageri projekt
-*Zastaviť → Vyčistiť → Zostaviť* (stiahne nový `latest`), alebo cez SSH
-`docker compose pull && docker compose up -d`. Index vo volume ostáva.
+**Update:** po novom pushi do `main` v Container Manageri: Projekt →
+`skfirma` → Akcia → Zostaviť (stiahne nový `latest` a reštartuje).
+Cez SSH: `docker compose pull && docker compose up -d`. Index vo volume
+ostáva.
 
-Bez domény v Cloudflare: alternatívou je Tailscale Funnel (verejná HTTPS
-adresa `*.ts.net`). Vtedy zmaž blok `cloudflared` a nastav
-`TRUST_PROXY: xff`.
+**Varianty:**
+- Za Cloudflare Tunnel (bez otvárania portov):
+  [`deploy/compose.cloudflare.yaml`](deploy/compose.cloudflare.yaml),
+  `TRUST_PROXY: cloudflare`, v tuneli Public hostname → `http://skfirma:8080`.
+- Iný server s Dockerom: `docker run -d -p 8080:8080 -v skfirma-data:/data ghcr.io/carnaby/sk-firma-mcp:latest`
+  a vlastná reverse proxy (Caddy, Traefik) s `TRUST_PROXY=xff`.
 
 ### Ochrana zdrojových API
 
