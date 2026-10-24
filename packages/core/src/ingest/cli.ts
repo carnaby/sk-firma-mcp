@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Ingest CLI: stiahne zoznamy (FS/SP/VšZP), rozparsuje, postaví SQLite index.
 // Per-dataset izolácia: pád jedného zdroja nezhodí ostatné; nedodané datasety
 // sa prenesú z predchádzajúcej DB (buildDatabase carry-over). Logy len stderr.
@@ -95,7 +94,7 @@ export async function runIngest(opts: { indexPath?: string; now?: () => Date } =
   return summary;
 }
 
-function printSummary(summary: IngestSummaryRow[]): void {
+export function printSummary(summary: IngestSummaryRow[]): void {
   console.error('\ndataset          | stav          | záznamov | as_of');
   console.error('-----------------|---------------|----------|-----------');
   for (const s of summary) {
@@ -103,11 +102,4 @@ function printSummary(summary: IngestSummaryRow[]): void {
       `${s.dataset.padEnd(16)} | ${s.status.padEnd(13)} | ${String(s.records ?? '—').padStart(8)} | ${s.as_of ?? '—'}${s.error ? `\n  ↳ ${s.error}` : ''}`,
     );
   }
-}
-
-const isMain = process.argv[1]?.replace(/\\/g, '/').endsWith('/cli.js');
-if (isMain) {
-  runIngest()
-    .then((summary) => { printSummary(summary); process.exit(0); })
-    .catch((e) => { console.error(`Ingest zlyhal: ${e instanceof Error ? e.message : String(e)}`); process.exit(1); });
 }

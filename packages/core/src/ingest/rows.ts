@@ -47,7 +47,8 @@ export interface VszpDebtorRow {
   payer_type: string | null;
   published_on: string | null;
 }
-export type DatasetName = 'vat_payers' | 'vat_erased' | 'vat_risky' | 'tax_debtors' | 'sp_debtors' | 'vszp_debtors';
+export const DATASET_NAMES = ['vat_payers', 'vat_erased', 'vat_risky', 'tax_debtors', 'sp_debtors', 'vszp_debtors'] as const;
+export type DatasetName = (typeof DATASET_NAMES)[number];
 export interface MetaRow {
   dataset: DatasetName;
   as_of: string;

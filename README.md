@@ -1,46 +1,94 @@
-# sk-firma-mcp-server
+# SK Firma — previerka slovenskej firmy (web + MCP)
 
-Prever si slovenskú firmu cez AI: MCP server nad verejnými registrami (RPO,
-RÚZ, Finančná správa, Sociálna poisťovňa, VšZP, Dôvera) s deterministickým
-rizikovým verdiktom 🟢/🟠/🔴.
+Prever si slovenskú firmu podľa IČO alebo názvu: identita z registra,
+účtovné závierky, dlhy voči štátu a poisťovniam, DPH status a
+deterministický rizikový verdikt 🟢/🟠/🔴. Na webe so živým testom aj ako
+MCP konektor pre Claude a iné AI klientov.
 
 Žiadny scraping RPO/RÚZ, žiadne ML skórovanie — live dopyty na oficiálne API
 (Register právnických osôb ŠÚ SR, Register účtovných závierok MF SR) plus
 lokálny index z pravidelne aktualizovaných verejných zoznamov dlžníkov a
-platiteľov DPH (`npm run ingest`, pozri sekciu **Ingest**) a transparentné
-pravidlá nad faktami. Výstup je navrhnutý pre LLM: kompaktný markdown do
-~1 500 tokenov, so zdrojmi a dátumom platnosti pri každom údaji.
+platiteľov DPH a transparentné pravidlá nad faktami. Výstup pre LLM je
+kompaktný markdown do ~1 500 tokenov, so zdrojmi a dátumom platnosti pri
+každom údaji.
 
-## Inštalácia
+## Štruktúra (npm workspaces)
 
-### Claude Code
+```
+packages/core   @skfirma/core — klienti RPO/RÚZ/Dôvera, ingest, risk engine,
+                use-case služby (search/profile/…/check), markdown render
+packages/mcp    sk-firma-mcp-server — MCP nástroje, stdio CLI, HTTP handler
+apps/server     jeden Node proces (Hono): web + /api + /mcp + denný ingest
+apps/web        React + Vite: landing, živý test previerky, návod na konektor
+```
+
+Logika žije len v `core/services.ts`. MCP nástroje aj webové API sú tenké
+obaly nad ňou, takže verdikt na webe a v Claude je vždy rovnaký.
+
+| Endpoint | Čo robí |
+|---|---|
+| `GET /` | web (SPA) |
+| `GET /api/check?q=<IČO alebo názov>` | previerka → `{ kind: "report", report, markdown }` alebo `{ kind: "ambiguous", candidates }` |
+| `GET /api/search?q=…` | vyhľadávanie v RPO |
+| `GET /api/health` | stav servera a lokálneho indexu (dátum a počet záznamov po datasetoch) |
+| `POST /mcp` | remote MCP, Streamable HTTP, bezstavový, bez autentifikácie |
+
+## Pripojenie MCP konektora
+
+### Remote (nasadený server)
+
+- **Claude (web/desktop):** Nastavenia → Connectors → Add custom connector → URL `https://<tvoja-doména>/mcp`
+- **Claude Code:** `claude mcp add --transport http skfirma https://<tvoja-doména>/mcp`
+
+### Lokálne (stdio)
 
 ```bash
-claude mcp add skfirma -- npx -y sk-firma-mcp-server
+npm ci && npm run build
+claude mcp add skfirma -- node /cesta/k/repu/packages/mcp/dist/bin/cli.js
 ```
 
-Over: `claude mcp list` má obsahovať `skfirma`. Žiadne API kľúče netreba —
-všetky zdroje sú verejné a bez autentifikácie. Pre `skfirma_debts`/
-`skfirma_vat_status` treba navyše lokálny index, pozri sekciu **Ingest**.
+Balík `sk-firma-mcp-server` zatiaľ nie je zverejnený na npm. Po
+`npm publish -w sk-firma-mcp-server` bude fungovať aj
+`claude mcp add skfirma -- npx -y sk-firma-mcp-server`. Biny v `dist/bin`
+sú zbundlované cez esbuild (privátny `@skfirma/core` je inlinovaný).
 
-### Claude Desktop
+## Spustenie a nasadenie
 
-Pridaj do `claude_desktop_config.json` (Nastavenia → Developer → Edit Config):
+### Lokálny vývoj
 
-```json
-{
-  "mcpServers": {
-    "skfirma": {
-      "command": "npx",
-      "args": ["-y", "sk-firma-mcp-server"]
-    }
-  }
-}
+```bash
+npm ci
+npm run dev        # server na :8787 (bez ingestu) + Vite na :5173 s proxy na /api a /mcp
+npm test           # všetky testy, bez internetu (fixtures, MockAgent, fake deps)
+npm run typecheck
 ```
 
-Po uložení reštartuj Claude Desktop. V zozname nástrojov by sa mali objaviť
-`skfirma_search`, `skfirma_profile`, `skfirma_financials`, `skfirma_debts`,
-`skfirma_vat_status`, `skfirma_check`.
+### Produkcia (Docker, hocikde s perzistentným diskom)
+
+```bash
+docker build -t skfirma .
+docker run -p 8080:8080 -v skfirma-data:/data skfirma
+```
+
+Kontajner pri štarte postaví index, ak chýba alebo je starší ako
+interval, a potom ho obnovuje každých `SKFIRMA_INGEST_INTERVAL_HOURS`.
+Ingest beží v child procese, aby parsovanie ~100 MB dát neblokovalo API.
+Funguje to na VPS, Fly.io, Railway aj Render, ak má služba **volume**
+pripojený na `/data`. Serverless (Vercel, Netlify, Cloudflare) nepôjde:
+SQLite index potrebuje disk a dlhožijúci proces.
+
+| Premenná | Default | |
+|---|---|---|
+| `PORT` | `8080` (Docker), `8787` (lokálne) | |
+| `SKFIRMA_INDEX_PATH` | `/data/skfirma-index.sqlite` (Docker) | cesta k SQLite indexu |
+| `SKFIRMA_INGEST_INTERVAL_HOURS` | `24` | `0` = vypnutý plánovaný ingest |
+| `RATE_LIMIT_PER_MINUTE` | `30` | na IP pre `/api`, dvojnásobok pre `/mcp` |
+| `TRUST_PROXY` | `1` (Docker) | IP klienta z `X-Forwarded-For` (za reverse proxy) |
+| `WEB_DIR` | `apps/web/dist` | build webu |
+| `SKFIRMA_DOVERA` | — | `0` vypne live lookup na Dôveru |
+
+Rate limit je v pamäti procesu, čo stačí pre jednu inštanciu. Chráni
+verejné štátne API pred tým, aby ich niekto cez tvoj server zahltil.
 
 ## Ingest (lokálny index dlžníkov a platiteľov DPH)
 
@@ -49,7 +97,7 @@ Po uložení reštartuj Claude Desktop. V zozname nástrojov by sa mali objaviť
 tieto registre live rozhranie nemajú. Index si postavíš príkazom:
 
 ```bash
-npm run ingest
+npm run build && npm run ingest   # z koreňa repa → ./data/skfirma-index.sqlite
 ```
 
 Stiahne a spracuje 6 verejných datasetov (~50–100 MB spolu):
@@ -456,30 +504,17 @@ agreguje verejné dáta, nenahrádza due diligence.
 
 ## Vývoj
 
-```bash
-npm install
-npm run build     # tsc → dist/
-npm test          # 141 unit/integration testov, všetko mockované (MockAgent/fixtures/tmp SQLite), beží aj bez internetu
-npm run ingest    # postaví lokálny index (data/skfirma-index.sqlite) zo 6 živých datasetov — pozri sekciu Ingest
-npm run smoke     # živý akceptačný smoke proti reálnym RPO/RÚZ/FS/SP/VšZP/Dôvera zdrojom (nie je súčasťou CI)
-```
+`npm run smoke -w sk-firma-mcp-server` je živý akceptačný smoke cez stdio proti reálnym
+RPO/RÚZ/FS/SP/VšZP/Dôvera zdrojom (nie je súčasťou CI). Potrebuje lokálny
+(negitovaný) zoznam testovacích IČO v `docs/smoke-cases.json` — pole objektov
+`{ ico, name, expect, expect_debtor?, expect_vat_payer? }`, kde `expect` je
+zoznam verdiktových emoji, ktoré sa majú v odpovedi `skfirma_check` objaviť.
+Cestu je možné zmeniť premennou `SKFIRMA_SMOKE_CASES`. Bez súboru skript
+vypíše návod a skončí s kódom 2.
 
-`npm run smoke` potrebuje lokálny (negitovaný) zoznam testovacích IČO v
-`docs/smoke-cases.json` — pole objektov `{ ico, name, expect, expect_debtor?, expect_vat_payer? }`,
-kde `expect` je zoznam verdiktových emoji, ktoré sa majú v odpovedi
-`skfirma_check` objaviť (napr. `["🟢", "🟠"]`). Voliteľné `expect_debtor: true`
-navyše zavolá `skfirma_debts` a overí výskyt slova „dlžník"; `expect_vat_payer:
-true` zavolá `skfirma_vat_status` a overí výskyt slova „platiteľ" — na tieto
-dva prípady treba v zozname reálny IČO platiteľa DPH a reálneho dlžníka
-(napr. z lokálneho indexu po `npm run ingest`). Cestu k súboru je možné
-zmeniť premennou prostredia `SKFIRMA_SMOKE_CASES`. Bez tohto súboru skript
-vypíše návod a skončí s kódom 2 (dáta sú zámerne mimo repozitára, aby sa
-doň nedostali reálne IČO). Pred spustením smoke buduj index cez `npm run
-ingest` (viď poznámku o Windows uzamknutí v sekcii **Ingest** — najprv
-zastav bežiaci server).
-
-MCP Inspector (ručné overenie nástrojov, anotácií a chybových stavov):
+MCP Inspector:
 
 ```bash
-npx @modelcontextprotocol/inspector node dist/index.js
+npx @modelcontextprotocol/inspector node packages/mcp/dist/bin/cli.js
+# alebo proti bežiacemu serveru: Streamable HTTP, URL http://localhost:8787/mcp
 ```

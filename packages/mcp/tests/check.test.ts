@@ -3,10 +3,10 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { readFileSync } from 'node:fs';
 import { buildServer, type Deps } from '../src/server.js';
-import type { FinancialsResult, SearchCandidate } from '../src/types.js';
+import type { FinancialsResult, SearchCandidate } from '@skfirma/core';
 
-const likvidaciaEntity = JSON.parse(readFileSync(new URL('./fixtures/rpo-likvidacia.json', import.meta.url), 'utf8'));
-const firma1Entity = JSON.parse(readFileSync(new URL('./fixtures/rpo-firma1.json', import.meta.url), 'utf8'));
+const likvidaciaEntity = JSON.parse(readFileSync(new URL('../../core/tests/fixtures/rpo-likvidacia.json', import.meta.url), 'utf8'));
+const firma1Entity = JSON.parse(readFileSync(new URL('../../core/tests/fixtures/rpo-firma1.json', import.meta.url), 'utf8'));
 
 const candidate = (ico: string, name: string, rpo_id: number): SearchCandidate =>
   ({ ico, name, address: 'Bratislava', psc: null, municipality: null, status: 'active', established_on: '2018-01-02', terminated_on: null, rpo_id });

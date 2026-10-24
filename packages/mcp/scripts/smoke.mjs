@@ -25,7 +25,7 @@ Cestu k súboru môžeš zmeniť premennou prostredia SKFIRMA_SMOKE_CASES.`);
 
 const CASES = JSON.parse(readFileSync(CASES_PATH, 'utf8'));
 
-const transport = new StdioClientTransport({ command: 'node', args: ['dist/index.js'] });
+const transport = new StdioClientTransport({ command: 'node', args: [new URL('../dist/bin/cli.js', import.meta.url).pathname] });
 const client = new Client({ name: 'smoke', version: '0.0.0' });
 await client.connect(transport);
 
