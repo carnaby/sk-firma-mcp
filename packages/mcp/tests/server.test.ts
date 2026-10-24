@@ -3,9 +3,9 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { readFileSync } from 'node:fs';
 import { buildServer, type Deps } from '../src/server.js';
-import type { SearchCandidate, FinancialsResult } from '../src/types.js';
+import type { SearchCandidate, FinancialsResult } from '@skfirma/core';
 
-const firma1Entity = JSON.parse(readFileSync(new URL('./fixtures/rpo-firma1.json', import.meta.url), 'utf8'));
+const firma1Entity = JSON.parse(readFileSync(new URL('../../core/tests/fixtures/rpo-firma1.json', import.meta.url), 'utf8'));
 
 const firma1Candidate: SearchCandidate = {
   ico: '11111111', name: 'Firma Jeden s. r. o.', address: 'Vzorová 123/4, 81101 Bratislava - mestská časť Staré Mesto',

@@ -1,37 +1,28 @@
 {
-  "name": "sk-firma-mcp-server",
-  "version": "0.1.0",
-  "description": "MCP server: previerka slovenskej firmy podľa IČO/názvu (RPO, RÚZ + risk engine)",
-  "license": "MIT",
+  "name": "sk-firma",
+  "private": true,
   "type": "module",
-  "bin": {
-    "sk-firma-mcp-server": "dist/index.js",
-    "sk-firma-mcp-ingest": "dist/ingest/cli.js"
-  },
-  "files": [
-    "dist"
+  "workspaces": [
+    "packages/core",
+    "packages/mcp",
+    "apps/web",
+    "apps/server"
   ],
-  "engines": {
-    "node": ">=20"
-  },
+  "engines": { "node": ">=20" },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "dev": "tsx src/index.ts",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke": "node scripts/smoke.mjs",
-    "ingest": "node dist/ingest/cli.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "better-sqlite3": "^12.11.1",
-    "fflate": "^0.8.3",
-    "undici": "^8.7.0",
-    "zod": "^4.4.3"
+    "dev": "npm run build -w @skfirma/core -w sk-firma-mcp-server && concurrently -n server,web \"npm run dev -w @skfirma/server\" \"npm run dev -w @skfirma/web\"",
+    "start": "node apps/server/dist/main.js",
+    "ingest": "node packages/mcp/dist/bin/ingest.js"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^26.1.1",
+    "concurrently": "^9.2.1",
+    "esbuild": "^0.28.1",
     "tsx": "^4.23.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"

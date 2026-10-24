@@ -115,6 +115,7 @@ export function renderVatStatus(v: VatStatusData): string {
 }
 
 export function renderCheck(input: {
+  ico?: string;
   profile: ProfileData | null;
   financials: FinancialsResult | null;
   debts: DebtsData | null;
@@ -124,7 +125,7 @@ export function renderCheck(input: {
 }): string {
   const { profile, financials, debts, vat, risk, failed_sections } = input;
   const name = profile?.name ?? financials?.name ?? 'Neznámy subjekt';
-  const ico = profile?.ico ?? financials?.ico ?? '?';
+  const ico = input.ico ?? profile?.ico ?? financials?.ico ?? '?';
   const parts: string[] = [`## ${name} (IČO ${ico}) — verdikt: ${VERDICT_LABEL[risk.verdict]}`];
   if (risk.flags.length) parts.push(`**Dôvody:** ${risk.flags.map((f) => `${f.detail} [${f.source}${f.as_of ? `, k ${f.as_of}` : ''}]`).join('; ')}.`);
   if (profile) parts.push(identityLines(profile));

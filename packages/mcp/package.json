@@ -1,0 +1,37 @@
+{
+  "name": "sk-firma-mcp-server",
+  "version": "0.2.0",
+  "description": "MCP server: previerka slovenskej firmy podľa IČO/názvu (RPO, RÚZ, dlžníci, DPH + risk engine)",
+  "license": "MIT",
+  "type": "module",
+  "repository": { "type": "git", "url": "git+https://github.com/carnaby/sk-firma-mcp.git", "directory": "packages/mcp" },
+  "bin": {
+    "sk-firma-mcp-server": "dist/bin/cli.js",
+    "sk-firma-mcp-ingest": "dist/bin/ingest.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist/bin"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/bundle.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx src/cli.ts",
+    "ingest": "node dist/bin/ingest.js",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^12.11.1",
+    "fflate": "^0.8.3",
+    "undici": "^8.7.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@skfirma/core": "*"
+  }
+}
