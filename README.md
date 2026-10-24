@@ -65,30 +65,107 @@ npm run typecheck
 
 ### Produkcia (Docker, hocikde s perzistentným diskom)
 
+Hotový image pre `linux/amd64` aj `linux/arm64` builduje GitHub Actions
+pri každom pushi do `main` → `ghcr.io/carnaby/sk-firma-mcp:latest`.
+
 ```bash
-docker build -t skfirma .
-docker run -p 8080:8080 -v skfirma-data:/data skfirma
+docker run -d -p 8080:8080 -v skfirma-data:/data ghcr.io/carnaby/sk-firma-mcp:latest
+# alebo lokálny build: docker build -t skfirma .
 ```
 
 Kontajner pri štarte postaví index, ak chýba alebo je starší ako
 interval, a potom ho obnovuje každých `SKFIRMA_INGEST_INTERVAL_HOURS`.
 Ingest beží v child procese, aby parsovanie ~100 MB dát neblokovalo API.
-Funguje to na VPS, Fly.io, Railway aj Render, ak má služba **volume**
+Funguje to na NAS, VPS, Fly.io aj Railway, ak má služba **volume**
 pripojený na `/data`. Serverless (Vercel, Netlify, Cloudflare) nepôjde:
 SQLite index potrebuje disk a dlhožijúci proces.
+
+### Nasadenie na Synology (DSM reverse proxy)
+
+Konektor v claude.ai volajú servery Anthropicu, takže server musí byť
+dostupný **z internetu cez HTTPS**. Na Synology to zvládne vstavaná
+reverse proxy s certifikátom Let's Encrypt; kontajner je dostupný len na
+localhoste NAS-u.
+
+```
+internet → router :443 → DSM reverse proxy (HTTPS) → localhost:8080 → kontajner
+```
+
+**Predpoklady:** DSM 7.2+ s Container Managerom, port 443 (a 80 pre
+vydanie certifikátu) presmerovaný z routera na NAS, DNS záznam
+subdomény (napr. `skfirma.tvojadomena.sk`, A/CNAME) mieri na tvoju
+verejnú IP.
+
+1. **Image na GHCR.** Po merge do `main` počkaj, kým dobehne workflow
+   *Docker image* (GitHub → Actions). Potom Packages → `sk-firma-mcp` →
+   Package settings → Change visibility → **Public**, aby si ho NAS
+   stiahol bez prihlasovania. Stačí raz.
+2. **Kontajner.** Container Manager → Projekt → Vytvoriť → názov
+   `skfirma`, cesta napr. `/docker/skfirma` → Zdroj: „Vytvoriť
+   docker-compose.yml" → vlož obsah [`deploy/compose.yaml`](deploy/compose.yaml)
+   → Ďalej (Web Station portál nezapínaj) → Hotovo.
+3. **Certifikát.** Ovládací panel → Zabezpečenie → Certifikát → Pridať
+   → Získať certifikát od Let's Encrypt → doména `skfirma.tvojadomena.sk`.
+   Ak už máš wildcard certifikát na doménu, tento krok preskoč.
+4. **Reverse proxy.** Ovládací panel → Prihlasovací portál → Rozšírené
+   → Reverzný server proxy → Vytvoriť:
+   - Zdroj: HTTPS, názov hostiteľa `skfirma.tvojadomena.sk`, port 443,
+     zapni HSTS
+   - Cieľ: HTTP, `localhost`, port `8080`
+   - Potom v Zabezpečenie → Certifikát → Nastavenia priraď tejto
+     službe certifikát z kroku 3.
+5. **Over.** `https://skfirma.tvojadomena.sk/api/health`. Prvý ingest
+   štartuje ~5 s po spustení a trvá pár minút; potom `index_available: true`.
+   Logy: Container Manager → Kontajner → `skfirma` → Denník.
+   **Skontroluj `client_ip`** — musí to byť tvoja verejná IP. Ak je tam
+   `172.x.x.x` (adresa proxy), limity by platili pre všetkých naraz: v
+   pravidle reverse proxy → Vlastná hlavička → Vytvoriť pridaj
+   `X-Forwarded-For` = `$proxy_add_x_forwarded_for`.
+6. **Konektor.** claude.ai → Nastavenia → Connectors → Add custom
+   connector → `https://skfirma.tvojadomena.sk/mcp`.
+
+**Update:** po novom pushi do `main` v Container Manageri: Projekt →
+`skfirma` → Akcia → Zostaviť (stiahne nový `latest` a reštartuje).
+Cez SSH: `docker compose pull && docker compose up -d`. Index vo volume
+ostáva.
+
+**Varianty:**
+- Za Cloudflare Tunnel (bez otvárania portov):
+  [`deploy/compose.cloudflare.yaml`](deploy/compose.cloudflare.yaml),
+  `TRUST_PROXY: cloudflare`, v tuneli Public hostname → `http://skfirma:8080`.
+- Iný server s Dockerom: `docker run -d -p 8080:8080 -v skfirma-data:/data ghcr.io/carnaby/sk-firma-mcp:latest`
+  a vlastná reverse proxy (Caddy, Traefik) s `TRUST_PROXY=xff`.
+
+### Ochrana zdrojových API
+
+Verejný web a `/mcp` znamenajú, že ktokoľvek môže cez tvoj server
+posielať dopyty na RPO, RÚZ a Dôveru. Ochrana má dve úrovne:
+
+| Vrstva | Chráni pred | Default |
+|---|---|---|
+| Limit na IP — minúta | jedným klientom, ktorý klikne 100× | API 20/min, MCP 60/min |
+| Limit na IP — deň | crawlerom z jednej adresy | API 300/deň, MCP 1 500/deň |
+| Cache + single-flight | opakovaným a súbežným dopytom na tú istú firmu | RPO 7 dní, RÚZ a Dôvera 1 deň |
+| Throttle na host | nárazom | ~2 req/s na RPO, RÚZ, Dôveru |
+| Max. fronta na host | zahlteniu (veľa IP naraz) | 20 čakajúcich, ďalší dostane hneď „vyťažené" (HTTP 503) |
+| Denný rozpočet na host | súčtu všetkých klientov | 20 000 dopytov/deň na zdroj |
+
+Aktuálne čísla (spotreba rozpočtu, fronta, odmietnuté) ukazuje
+`/api/health` → `upstream`. Limity sú v pamäti procesu: reštart ich
+vynuluje a pri viacerých inštanciách by ich bolo treba zdieľať (Redis).
 
 | Premenná | Default | |
 |---|---|---|
 | `PORT` | `8080` (Docker), `8787` (lokálne) | |
 | `SKFIRMA_INDEX_PATH` | `/data/skfirma-index.sqlite` (Docker) | cesta k SQLite indexu |
 | `SKFIRMA_INGEST_INTERVAL_HOURS` | `24` | `0` = vypnutý plánovaný ingest |
-| `RATE_LIMIT_PER_MINUTE` | `30` | na IP pre `/api`, dvojnásobok pre `/mcp` |
-| `TRUST_PROXY` | `1` (Docker) | IP klienta z `X-Forwarded-For` (za reverse proxy) |
+| `TRUST_PROXY` | `none` | `cloudflare` = IP z `CF-Connecting-IP`; `xff` = posledná položka `X-Forwarded-For` (vlastná reverse proxy) |
+| `RATE_LIMIT_API_PER_MINUTE` / `_PER_DAY` | `20` / `300` | na IP pre `/api/check` a `/api/search` |
+| `RATE_LIMIT_MCP_PER_MINUTE` / `_PER_DAY` | `60` / `1500` | na IP pre `/mcp` (jedno použitie nástroja = 2–4 volania) |
+| `SKFIRMA_UPSTREAM_MAX_QUEUE` | `20` | max. čakajúcich dopytov na jeden zdroj |
+| `SKFIRMA_UPSTREAM_DAILY_BUDGET` | `20000` | max. dopytov na jeden zdroj za deň (UTC) |
 | `WEB_DIR` | `apps/web/dist` | build webu |
 | `SKFIRMA_DOVERA` | — | `0` vypne live lookup na Dôveru |
-
-Rate limit je v pamäti procesu, čo stačí pre jednu inštanciu. Chráni
-verejné štátne API pred tým, aby ich niekto cez tvoj server zahltil.
 
 ## Ingest (lokálny index dlžníkov a platiteľov DPH)
 

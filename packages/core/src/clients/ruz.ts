@@ -35,11 +35,7 @@ export class RuzClient {
 
   private async api(path: string, ttlMs = CONFIG.ruz.cacheTtlMs): Promise<unknown> {
     const url = `${CONFIG.ruz.baseUrl}${path}`;
-    const hit = this.cache.get(`ruz:${url}`);
-    if (hit !== undefined) return hit;
-    const data = await fetchJson(url, { timeoutMs: CONFIG.ruz.timeoutMs });
-    this.cache.set(`ruz:${url}`, data, ttlMs);
-    return data;
+    return this.cache.getOrLoad(`ruz:${url}`, ttlMs, () => fetchJson(url, { timeoutMs: CONFIG.ruz.timeoutMs }));
   }
 
   async financials(ico: string, years: number): Promise<FinancialsResult> {

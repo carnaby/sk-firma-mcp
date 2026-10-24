@@ -15,6 +15,12 @@ export const CONFIG = {
     minIntervalMs: 500, // ~2 req/s per host
     maxRetries: 2,      // len 5xx/429
     backoffBaseMs: 1_000,
+    // Ochrana verejných API pred tým, aby ich niekto zahltil cez náš server.
+    // Gettery, nie snapshot — env sa dá meniť v testoch aj bez reštartu modulu.
+    /** Max. dopytov čakajúcich vo fronte na jeden host; ďalšie hneď dostanú „vyťažené". */
+    get maxQueuePerHost() { return Number(process.env.SKFIRMA_UPSTREAM_MAX_QUEUE ?? 20); },
+    /** Max. odchádzajúcich dopytov na jeden host za deň (UTC), vrátane retry. */
+    get dailyBudgetPerHost() { return Number(process.env.SKFIRMA_UPSTREAM_DAILY_BUDGET ?? 20_000); },
   },
   cacheMaxSize: 5_000,
   risk: {

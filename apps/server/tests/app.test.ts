@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { ApiCheckResponse, Deps, FinancialsResult, SearchCandidate } from '@skfirma/core';
+import { BusyError, type ApiCheckResponse, type Deps, type FinancialsResult, type SearchCandidate } from '@skfirma/core';
 import { createApp } from '../src/app.js';
 import { RateLimiter } from '../src/rate-limit.js';
 
@@ -76,13 +76,52 @@ describe('HTTP API', () => {
     expect(await res.text()).not.toContain('secret');
   });
 
-  it('rate limit → 429 s Retry-After', async () => {
-    const app = createApp({ deps: deps(), rateLimitPerMinute: 2 });
-    expect((await get(app, '/api/health')).status).toBe(200);
-    expect((await get(app, '/api/health')).status).toBe(200);
-    const res = await get(app, '/api/health');
+  it('rate limit za minútu → 429 s Retry-After; health sa nelimituje', async () => {
+    const app = createApp({ deps: deps(), limits: { apiPerMinute: 2 } });
+    expect((await get(app, '/api/check?q=11111111')).status).toBe(200);
+    expect((await get(app, '/api/check?q=11111111')).status).toBe(200);
+    const res = await get(app, '/api/check?q=11111111');
     expect(res.status).toBe(429);
     expect(res.headers.get('retry-after')).toBeTruthy();
+    expect((await get(app, '/api/health')).status).toBe(200);
+  });
+
+  it('denný limit na IP → 429 s hláškou „zajtra"', async () => {
+    const app = createApp({ deps: deps(), limits: { apiPerMinute: 100, apiPerDay: 1 } });
+    await get(app, '/api/check?q=11111111');
+    const res = await get(app, '/api/check?q=11111111');
+    expect(res.status).toBe(429);
+    expect(((await res.json()) as { error: string }).error).toMatch(/denný limit/);
+  });
+
+  it('za proxy: X-Forwarded-For sa číta zprava — podvrhnutá prvá položka limit neobíde', async () => {
+    const app = createApp({ deps: deps(), trustProxy: 'xff', limits: { apiPerMinute: 1 } });
+    const req = (spoof: string) => app.request('/api/check?q=11111111', { headers: { 'x-forwarded-for': `${spoof}, 203.0.113.7` } });
+    expect((await req('1.1.1.1')).status).toBe(200);
+    expect((await req('2.2.2.2')).status).toBe(429); // iná podvrhnutá IP, rovnaký reálny klient
+  });
+
+  it('za Cloudflare: kľúčom je CF-Connecting-IP', async () => {
+    const app = createApp({ deps: deps(), trustProxy: 'cloudflare', limits: { apiPerMinute: 1 } });
+    const req = (ip: string) => app.request('/api/check?q=11111111', { headers: { 'cf-connecting-ip': ip, 'x-forwarded-for': '9.9.9.9' } });
+    expect((await req('198.51.100.1')).status).toBe(200);
+    expect((await req('198.51.100.2')).status).toBe(200);
+    expect((await req('198.51.100.1')).status).toBe(429);
+  });
+
+  it('vyťažený zdroj (BusyError) → 503 s Retry-After, nie zavádzajúci verdikt', async () => {
+    const busy = new BusyError('Server je momentálne vyťažený', 30);
+    const app = createApp({ deps: deps({ ruz: { financials: async () => { throw busy; } } }) });
+    const res = await get(app, '/api/check?q=11111111');
+    expect(res.status).toBe(503);
+    expect(res.headers.get('retry-after')).toBe('30');
+  });
+
+  it('health ukazuje stav limitov a odchádzajúcich dopytov', async () => {
+    const body = (await (await get(createApp({ deps: deps() }), '/api/health')).json()) as Record<string, unknown>;
+    expect(body).toHaveProperty('upstream');
+    expect(body).toHaveProperty('limits');
+    expect(body).toHaveProperty('client_ip');
   });
 });
 

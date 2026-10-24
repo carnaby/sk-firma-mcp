@@ -1,0 +1,34 @@
+# SK Firma na Synology NAS za DSM reverse proxy (bez Cloudflare Tunnel).
+# Postup: README → „Nasadenie na Synology (DSM reverse proxy)".
+#
+# Tok: internet → router :443 → DSM reverse proxy (HTTPS, Let's Encrypt)
+#      → http://localhost:8080 → tento kontajner
+
+services:
+  skfirma:
+    image: ghcr.io/carnaby/sk-firma-mcp:latest
+    container_name: skfirma
+    restart: unless-stopped
+    ports:
+      # len na localhost NAS-u: dnu sa ide výhradne cez DSM reverse proxy.
+      # Na 0.0.0.0 by sa dal z LAN obísť proxy aj podvrhnúť X-Forwarded-For.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # pomenovaný volume, nie ./data — Docker mu nastaví správneho vlastníka
+      # (kontajner beží ako neprivilegovaný user), bind mount na DSM by
+      # skončil s „permission denied" pri ingeste
+      - skfirma-data:/data
+    environment:
+      TZ: Europe/Bratislava
+      # DSM reverse proxy (nginx) pridáva IP klienta na koniec X-Forwarded-For
+      TRUST_PROXY: xff
+      # Limity — defaulty sú rozumné, odkomentuj len ak treba
+      # RATE_LIMIT_API_PER_MINUTE: "20"
+      # RATE_LIMIT_API_PER_DAY: "300"
+      # RATE_LIMIT_MCP_PER_MINUTE: "60"
+      # RATE_LIMIT_MCP_PER_DAY: "1500"
+      # SKFIRMA_UPSTREAM_DAILY_BUDGET: "20000"
+      # SKFIRMA_UPSTREAM_MAX_QUEUE: "20"
+
+volumes:
+  skfirma-data:

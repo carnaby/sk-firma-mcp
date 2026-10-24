@@ -11,7 +11,7 @@
   "engines": { "node": ">=20" },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run build -w @skfirma/core -w sk-firma-mcp-server && npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev": "npm run build -w @skfirma/core -w sk-firma-mcp-server && concurrently -n server,web \"npm run dev -w @skfirma/server\" \"npm run dev -w @skfirma/web\"",
