@@ -1,4 +1,4 @@
-import { fork } from 'node:child_process';
+import { fork, type ChildProcess } from 'node:child_process';
 import { statSync } from 'node:fs';
 
 /**
@@ -8,16 +8,15 @@ import { statSync } from 'node:fs';
  */
 export function scheduleIngest(opts: { indexPath: string; intervalHours: number }): () => void {
   const intervalMs = opts.intervalHours * 3600_000;
-  let running = false;
+  let child: ChildProcess | null = null;
 
   const run = () => {
-    if (running) return;
-    running = true;
+    if (child) return;
     const started = Date.now();
     console.error('[ingest] štart');
-    const child = fork(new URL('./ingest-worker.js', import.meta.url), { stdio: 'inherit' });
+    child = fork(new URL('./ingest-worker.js', import.meta.url), { stdio: 'inherit' });
     child.on('exit', (code) => {
-      running = false;
+      child = null;
       console.error(`[ingest] koniec (kód ${code}, ${Math.round((Date.now() - started) / 1000)} s)`);
     });
   };
@@ -31,5 +30,10 @@ export function scheduleIngest(opts: { indexPath: string; intervalHours: number 
   }, firstIn);
   timer.unref();
   console.error(`[ingest] ďalší beh o ${Math.round(firstIn / 60_000)} min, potom každých ${opts.intervalHours} h`);
-  return () => clearTimeout(timer);
+  // stop: zruší plán a ukončí bežiaci ingest (rozpracovaný <index>.new sa
+  // nepoužije — ďalší beh ho zmaže, platný index ostáva nedotknutý)
+  return () => {
+    clearTimeout(timer);
+    child?.kill('SIGTERM');
+  };
 }

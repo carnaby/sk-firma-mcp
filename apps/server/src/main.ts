@@ -34,8 +34,25 @@ const app = createApp({
   },
 });
 
-if (ingestHours > 0) scheduleIngest({ indexPath, intervalHours: ingestHours });
+const stopIngest = ingestHours > 0 ? scheduleIngest({ indexPath, intervalHours: ingestHours }) : () => {};
 
-serve({ fetch: app.fetch, port }, (info) => {
+const server = serve({ fetch: app.fetch, port }, (info) => {
   console.error(`${SERVER_INFO.name} ${SERVER_INFO.version} — http://localhost:${info.port} (web), /api, /mcp`);
 });
+
+// Node ako PID 1 v kontajneri nemá predvolené spracovanie signálov — bez
+// tohto by `docker stop` (aj Watchtower pri update) čakal 10 s na SIGKILL.
+// Bežiace dopyty dostanú max. SHUTDOWN_GRACE_MS, potom končíme natvrdo.
+const SHUTDOWN_GRACE_MS = 5_000;
+let shuttingDown = false;
+function shutdown(signal: NodeJS.Signals): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.error(`[server] ${signal} — končím`);
+  stopIngest();
+  server.close(() => process.exit(0));
+  if ('closeIdleConnections' in server) server.closeIdleConnections(); // keep-alive spojenia by close() blokovali
+  setTimeout(() => process.exit(0), SHUTDOWN_GRACE_MS).unref();
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
