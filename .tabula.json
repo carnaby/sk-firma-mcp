@@ -1,0 +1,5 @@
+{
+  "project": "sk-firma-mcp",
+  "sync": ["docs/**", ".superpowers/sdd/progress.md"],
+  "state": ["docs/memory/*.md"]
+}
