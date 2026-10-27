@@ -87,8 +87,18 @@ h3 { font-size: 1.05rem; }
   background: var(--accent); color: var(--accent-text); padding: 0 22px;
 }
 .search button:disabled { opacity: 0.55; cursor: default; }
-.examples { color: var(--muted); font-size: 0.925rem; margin-top: 10px; }
-button.link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.search-hint { color: var(--muted); font-size: 0.925rem; margin-top: 10px; }
+.search-hint strong { color: var(--text); font-weight: 600; }
+.search-notice {
+  display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 10px 14px;
+  font-size: 0.875rem; line-height: 1.45; color: var(--muted);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.notice-icon {
+  flex: none; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 0.75rem; font-weight: 700; font-style: italic;
+  font-family: Georgia, serif; color: var(--accent-text); background: var(--accent);
+}
 
 /* cards */
 .results { min-height: 8px; padding-bottom: 8px; }

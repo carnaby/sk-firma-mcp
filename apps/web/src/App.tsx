@@ -10,8 +10,6 @@ type State =
   | { status: 'error'; q: string; message: string }
   | { status: 'done'; q: string; data: ApiCheckResponse };
 
-const EXAMPLES = ['Slovenská pošta', 'Slovnaft'];
-
 function readQuery(): string {
   return new URLSearchParams(window.location.search).get('q') ?? '';
 }
@@ -96,19 +94,23 @@ export function App() {
                 autoComplete="off"
                 spellCheck={false}
                 autoFocus
+                aria-describedby="q-hint"
               />
               <button type="submit" disabled={busy || !input.trim()}>
                 {busy ? 'Overujem…' : 'Preveriť'}
               </button>
             </form>
-            <p className="examples">
-              Skús napr.{' '}
-              {EXAMPLES.map((ex, i) => (
-                <span key={ex}>
-                  {i > 0 && ' alebo '}
-                  <button type="button" className="link" onClick={() => void run(ex)}>{ex}</button>
-                </span>
-              ))}
+            <p className="search-hint" id="q-hint">
+              <strong>IČO</strong> (8 číslic) alebo <strong>názov firmy</strong> — stačí aj jeho časť, aspoň 3 znaky.
+              Podľa názvu hľadáme len medzi aktívnymi subjektmi; pri viacerých zhodách si vyberieš zo zoznamu.
+            </p>
+            <p className="search-notice" role="note">
+              <span aria-hidden className="notice-icon">i</span>
+              <span>
+                Údaje pochádzajú z verejne dostupných registrov štátu a poisťovní a nemusia byť úplné ani aktuálne.
+                Výsledok je informatívny — nie je to úverový rating, právne posúdenie ani odporúčanie.
+                Rozhodnutie je vždy na tebe.
+              </span>
             </p>
           </div>
         </section>
