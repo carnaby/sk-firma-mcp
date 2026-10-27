@@ -9,6 +9,9 @@ services:
     image: ghcr.io/carnaby/sk-firma-mcp:latest
     container_name: skfirma
     restart: unless-stopped
+    # Watchtower na NAS (repo services) sleduje len kontajnery s týmto labelom:
+    # nový :latest po pushi do main nasadí do ~5 min, volume s indexom ostáva.
+    labels: ['com.centurylinklabs.watchtower.enable=true']
     ports:
       # len na localhost NAS-u: dnu sa ide výhradne cez DSM reverse proxy.
       # Na 0.0.0.0 by sa dal z LAN obísť proxy aj podvrhnúť X-Forwarded-For.

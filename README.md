@@ -128,10 +128,13 @@ verejnú IP.
 6. **Konektor.** claude.ai → Nastavenia → Connectors → Add custom
    connector → `https://skfirma.tvojadomena.sk/mcp`.
 
-**Update:** po novom pushi do `main` v Container Manageri: Projekt →
-`skfirma` → Akcia → Zostaviť (stiahne nový `latest` a reštartuje).
-Cez SSH: `docker compose pull && docker compose up -d`. Index vo volume
-ostáva.
+**Update:** automaticky cez [Watchtower](https://containrrr.dev/watchtower/)
+v režime `WATCHTOWER_LABEL_ENABLE=true` — `deploy/compose.yaml` má label
+`com.centurylinklabs.watchtower.enable=true`, takže nový `latest` po
+pushi do `main` (workflow *Docker image*) nasadí do ~5 min od zverejnenia
+image. Ručne v Container Manageri: Projekt → `skfirma` → Akcia → Zostaviť,
+alebo cez SSH `docker compose pull && docker compose up -d`. Index vo
+volume ostáva.
 
 **Varianty:**
 - Za Cloudflare Tunnel (bez otvárania portov):
