@@ -48,6 +48,19 @@ for (const c of CASES) {
     console.log(`\n=== DEBTS ${c.name} — ${dok ? 'OK' : 'FAIL'} ===\n${dmd}`);
     if (!dok) failed++;
   }
+  if (c.expect_pdf_attachments) {
+    // každý PDF odkaz z výstupu musí byť živý: HEAD → 200 + application/pdf (RÚZ nepodporuje Range)
+    const urls = [...md.matchAll(/https:\/\/www\.registeruz\.sk\/\S+\/attachment\/\d+/g)].map((m) => m[0]);
+    let pdfOk = urls.length >= c.expect_pdf_attachments;
+    for (const url of urls) {
+      const r = await fetch(url, { method: 'HEAD' });
+      const ok = r.status === 200 && (r.headers.get('content-type') ?? '').startsWith('application/pdf');
+      if (!ok) { pdfOk = false; console.log(`  PDF FAIL ${r.status} ${r.headers.get('content-type')} ${url}`); }
+    }
+    console.log(`
+=== PDF ${c.name} — ${urls.length} odkazov (min. ${c.expect_pdf_attachments}) ${pdfOk ? 'OK' : 'FAIL'} ===`);
+    if (!pdfOk) failed++;
+  }
   if (c.expect_vat_payer) {
     const vres = await client.callTool({ name: 'skfirma_vat_status', arguments: { ico: c.ico } });
     const vmd = vres.content?.[0]?.text ?? '';

@@ -68,7 +68,7 @@ export function deriveStatus(e: RpoEntityLike): {
 const personName = (p: z.infer<typeof Person>): string =>
   p.personName?.formatedName ?? p.fullName ?? 'neznáme meno';
 
-export function mapEntityToProfile(entityRaw: unknown): ProfileData {
+export function mapEntityToProfile(entityRaw: unknown, now: Date = new Date()): ProfileData {
   const e = RpoEntity.parse(entityRaw);
   const { status, status_text, status_since } = deriveStatus(e);
   return {
@@ -92,6 +92,7 @@ export function mapEntityToProfile(entityRaw: unknown): ProfileData {
       ? { code: e.statisticalCodes.mainActivity.code, name: e.statisticalCodes.mainActivity.value ?? '' }
       : null,
     source_register: e.sourceRegister?.value?.value ?? null,
-    as_of: e.dbModificationDate ?? null,
+    as_of: now.toISOString().slice(0, 10), // živý dopyt — údaje platia k dnešku
+    record_modified_on: e.dbModificationDate ?? null, // posledná zmena záznamu v RPO (nie vek dát)
   };
 }

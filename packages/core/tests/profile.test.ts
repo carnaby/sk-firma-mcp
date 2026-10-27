@@ -7,7 +7,7 @@ const fx = (name: string) =>
 
 describe('mapEntityToProfile', () => {
   it('aktívna firma — aktuálne hodnoty z historizovaných polí', () => {
-    const p = mapEntityToProfile(fx('rpo-firma1.json'));
+    const p = mapEntityToProfile(fx('rpo-firma1.json'), new Date('2026-10-27T10:00:00Z'));
     expect(p).toMatchObject({
       ico: '11111111',
       name: 'Firma Jeden s. r. o.',
@@ -20,7 +20,8 @@ describe('mapEntityToProfile', () => {
       status_text: null,
       main_activity: { code: '6210', name: 'Počítačové programovanie' },
       source_register: 'Obchodný register',
-      as_of: '2025-07-07',
+      as_of: '2026-10-27', // deň živého dopytu, nie vek záznamu
+      record_modified_on: '2025-07-07', // RPO dbModificationDate
     });
     expect(p.executives).toEqual([{ name: 'Ing. Ján Vzorový', role: 'Konateľ', since: '2018-01-02' }]);
     expect(p.shareholders).toEqual([{ name: 'Ing. Ján Vzorový' }]);

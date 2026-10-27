@@ -1,18 +1,20 @@
 import { CONFIG } from '../config.js';
-import type { DebtsData, Flag, FinancialsResult, ProfileData, VatStatusData, Verdict } from '../types.js';
+import type { Completeness, CreditorCompleteness, CreditorDebt, DebtsData, Flag, FinancialsResult, ProfileData, VatStatusData, Verdict } from '../types.js';
 
 export interface RiskInput {
   profile: ProfileData | null;
   financials: FinancialsResult | null;
   debts: DebtsData | null;
   vat: VatStatusData | null;
-  failed_sources: string[];
+  completeness: Completeness;
   now: Date;
 }
 export interface RiskResult {
   verdict: Verdict;
   flags: Flag[];
-  notes: string[];
+  /** Dôvody neúplnosti dát. Pri ⚪ sú to „Dôvody" verdiktu, inak len poznámka — verdikt nezhoršujú. */
+  incomplete: string[];
+  completeness: Completeness;
 }
 
 const RED = new Set(['terminated', 'insolvency', 'negative_equity', 'vat_erased_52_8', 'vat_risky_52_6', 'debtor_major']);
@@ -24,9 +26,8 @@ const monthsBetween = (fromIso: string, to: Date): number => {
   return months;
 };
 
-export function evaluateRisk({ profile, financials, debts, vat, failed_sources, now }: RiskInput): RiskResult {
+export function evaluateRisk({ profile, financials, debts, vat, completeness, now }: RiskInput): RiskResult {
   const flags: Flag[] = [];
-  const notes: string[] = [];
 
   if (profile) {
     const src = 'RPO, ŠÚ SR';
@@ -57,10 +58,6 @@ export function evaluateRisk({ profile, financials, debts, vat, failed_sources, 
       if (latestYear < now.getFullYear() - CONFIG.risk.noRecentStatementsPeriods) {
         flags.push({ code: 'no_recent_statements', detail: `posledná závierka za ${latest.period_label}`, as_of: financials.as_of, source: src });
       }
-    } else if (financials.unavailable_reason === 'ifrs_pdf_only') {
-      notes.push('Financie: firma účtuje podľa IFRS — register poskytuje len PDF, štruktúrované dáta nedostupné.');
-    } else if (financials.unavailable_reason) {
-      notes.push('Financie: štruktúrované závierky nedostupné (nepodporovaný typ výkazov alebo žiadne závierky).');
     }
   }
 
@@ -90,17 +87,88 @@ export function evaluateRisk({ profile, financials, debts, vat, failed_sources, 
         flags.push({ code: 'debtor_minor', detail, as_of: flagAsOf, source: sources });
       }
     }
-    for (const [k, c] of Object.entries(debts.creditors)) {
-      if (c.status === 'unverifiable') {
-        notes.push(`${LABELS[k]}: dlh sa nepodarilo jednoznačne overiť${c.note ? ` (${c.note})` : ''} — verdikt je preto najviac 🟠.`);
+  }
+
+  const incomplete = incompleteReasons(completeness, debts);
+  const hasRed = flags.some((f) => RED.has(f.code));
+  // Riziko a úplnosť sú dve osi: signál rozhoduje o 🟠/🔴, neúplnosť bez signálu = ⚪.
+  const verdict: Verdict = hasRed ? 'red' : flags.length > 0 ? 'orange' : incomplete.length > 0 ? 'incomplete' : 'green';
+  // Invariant: každý verdikt okrem 🟢 musí mať aspoň jeden dôvod.
+  if (verdict !== 'green' && flags.length === 0 && incomplete.length === 0) {
+    throw new Error(`risk engine bug: verdikt ${verdict} bez dôvodu`);
+  }
+  return { verdict, flags, incomplete, completeness };
+}
+
+// ---------- úplnosť dát ----------
+
+const KEY_CREDITORS = ['fs', 'sp', 'vszp'] as const; // štátne/verejné zoznamy; Dôvera a Union verdikt neovplyvňujú
+const CREDITOR_LABEL: Record<keyof DebtsData['creditors'], string> = {
+  fs: 'Finančná správa', sp: 'Sociálna poisťovňa', vszp: 'VšZP', dovera: 'Dôvera', union: 'Union',
+};
+
+export function creditorCompleteness(c: CreditorDebt): CreditorCompleteness {
+  return c.status === 'debtor' || c.status === 'not_found' ? 'ok' : c.status;
+}
+
+export function assessCompleteness(input: {
+  requested: { profile: boolean; financials: boolean; debts: boolean; vat: boolean };
+  profile: ProfileData | null;
+  financials: FinancialsResult | null;
+  debts: DebtsData | null;
+  vat: VatStatusData | null;
+}): Completeness {
+  const { requested: r, profile, financials, debts, vat } = input;
+  const fin = (): Completeness['financials'] => {
+    if (!r.financials) return 'not_requested';
+    if (!financials) return 'missing';
+    if (financials.years.length > 0) return 'structured';
+    switch (financials.unavailable_reason) {
+      case 'ifrs_pdf_only': return 'pdf_only';
+      case 'unsupported_template': return 'unsupported';
+      default: return 'no_statements';
+    }
+  };
+  return {
+    profile: !r.profile ? 'not_requested' : profile ? 'ok' : 'missing',
+    financials: fin(),
+    debts: !r.debts ? 'not_requested' : !debts ? 'missing' : {
+      fs: creditorCompleteness(debts.creditors.fs),
+      sp: creditorCompleteness(debts.creditors.sp),
+      vszp: creditorCompleteness(debts.creditors.vszp),
+      dovera: creditorCompleteness(debts.creditors.dovera),
+      union: creditorCompleteness(debts.creditors.union),
+    },
+    vat: !r.vat ? 'not_requested' : vat ? 'ok' : 'missing',
+  };
+}
+
+export function incompleteReasons(c: Completeness, debts: DebtsData | null): string[] {
+  const out: string[] = [];
+  if (c.profile === 'missing') out.push('identita z RPO nie je dostupná (register neodpovedal)');
+  if (c.profile === 'not_requested') out.push('identita (RPO) nebola vyžiadaná');
+  switch (c.financials) {
+    case 'pdf_only': out.push('financie len v PDF (IFRS) — štruktúrované dáta nie sú k dispozícii'); break;
+    case 'unsupported': out.push('výkazy v nepodporovanej šablóne (napr. jednoduché účtovníctvo, neziskovka) — štruktúrované financie nie sú k dispozícii'); break;
+    case 'no_statements': out.push('v Registri účtovných závierok nie je použiteľná závierka'); break;
+    case 'missing': out.push('Register účtovných závierok neodpovedal — financie chýbajú'); break;
+    case 'not_requested': out.push('financie (RÚZ) neboli vyžiadané'); break;
+  }
+  if (c.debts === 'missing') out.push('zoznamy dlžníkov nie sú dostupné');
+  else if (c.debts === 'not_requested') out.push('dlhy neboli vyžiadané');
+  else {
+    const d = c.debts;
+    if (KEY_CREDITORS.every((k) => d[k] === 'unavailable')) {
+      out.push('zoznamy dlžníkov FS, SP a VšZP nie sú dostupné (chýba lokálny index)');
+    } else {
+      for (const k of KEY_CREDITORS) {
+        const note = debts?.creditors[k].note;
+        if (d[k] === 'unverifiable') out.push(`${CREDITOR_LABEL[k]}: ${note ? note.replace(/\.$/, '') : 'dlh sa nedá jednoznačne priradiť'}`);
+        else if (d[k] !== 'ok') out.push(`${CREDITOR_LABEL[k]}: zoznam dlžníkov nie je dostupný`);
       }
     }
   }
-
-  for (const s of failed_sources) notes.push(`Zdroj ${s} nedostupný — sekcia chýba, verdikt je preto najviac 🟠.`);
-
-  const hasRed = flags.some((f) => RED.has(f.code));
-  const capped = notes.length > 0; // chýbajúci zdroj ≠ zelená (zadanie §6 zásada 2)
-  const verdict: Verdict = hasRed ? 'red' : flags.length > 0 || capped ? 'orange' : 'green';
-  return { verdict, flags, notes };
+  if (c.vat === 'missing') out.push('DPH status nie je dostupný (lokálny index)');
+  if (c.vat === 'not_requested') out.push('DPH status nebol vyžiadaný');
+  return out;
 }

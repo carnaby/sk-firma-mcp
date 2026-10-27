@@ -86,7 +86,8 @@ export async function runIngest(opts: { indexPath?: string; now?: () => Date } =
   // previous drží readonly handle na indexPath — buildDatabase o chvíľu ten
   // istý súbor atomicky nahradí (rename); zatvoriť skôr, než sa o to pokúsi.
   previous.close();
-  const { carried } = buildDatabase(indexPath, fresh, indexPath);
+  const notModified = summary.filter((x) => x.status === 'not_modified').map((x) => x.dataset);
+  const { carried } = buildDatabase(indexPath, fresh, indexPath, { datasets: notModified, fetchedAt });
   for (const dataset of carried) {
     const s = summary.find((x) => x.dataset === dataset);
     if (s && s.status === 'failed') s.status = 'carried';

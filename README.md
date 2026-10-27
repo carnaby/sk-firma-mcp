@@ -7,7 +7,8 @@
 Check a Slovak company by its IČO (company ID) or name before you sign a
 contract or send an invoice: registry identity, financial statements, debts
 to the tax office and insurers, VAT status — and a deterministic risk verdict
-🟢 / 🟠 / 🔴 with the reasons, sources and dates behind it.
+🟢 / 🟠 / 🔴 (or ⚪ when key data is missing) with the reasons, sources and
+dates behind it.
 
 It runs as a website with a live check and as an **MCP server**, so Claude
 and other AI clients can call it as a tool ("Check company XY before I sign
@@ -58,7 +59,7 @@ or `json`.
 | `skfirma_check` | **Main tool.** Full check in one call: identity, 3 years of financials, debts, VAT status and the verdict with reasons. Takes `ico` or `name`; an ambiguous name returns candidates instead of guessing. |
 | `skfirma_search` | Find a company by name or IČO (disambiguation). |
 | `skfirma_profile` | Legal form, address, status (active / in liquidation / bankrupt / dissolved), statutory bodies, shareholders, main activity (SK NACE). |
-| `skfirma_financials` | Revenue, profit, equity, debt ratio and YoY revenue change from financial statements — derived metrics, not raw statements. |
+| `skfirma_financials` | Revenue, profit, equity, debt ratio and YoY revenue change from financial statements — derived metrics, not raw statements. For IFRS reporters (PDF only) it returns working links to the PDF attachments with year, type and size. |
 | `skfirma_debts` | Debtor status and amounts: Financial Administration (tax), Social Insurance Agency, health insurers VšZP and Dôvera. |
 | `skfirma_vat_status` | VAT registration, deregistered VAT payers (§52/8) and risky VAT payers (§52/6). Accepts `ico` or `ic_dph`. |
 
@@ -99,10 +100,17 @@ Worst-of over the flags below; no weights, no score. Thresholds live in
 | `revenue_drop` | revenue YoY < −30 % | 🟠 |
 | `young_company` | younger than 24 months | 🟠 |
 | `high_leverage` | liabilities / assets > 90 % | 🟠 |
-| — | no flag | 🟢 |
+| — | no flag, all key sections available | 🟢 |
+| — | no flag, but a key section is missing (financials only as PDF/IFRS, a register didn't respond, no local index, tax debt can't be matched, section not requested) | ⚪ |
 
-A missing source never counts as green: if debts or VAT can't be verified,
-the verdict is at most 🟠 with a note.
+Risk and data completeness are two separate axes — **incomplete data is not
+a risk**. A missing source never makes the verdict worse: with a risk signal
+it is only noted, without one the verdict is ⚪ ("can't be assessed") with
+the reasons. An unavailable Dôvera or Union never changes the verdict, and
+every verdict except 🟢 states at least one reason. The JSON output carries
+`completeness` (per section and creditor) and `index_freshness`; an index
+older than `SKFIRMA_INDEX_STALE_DAYS` (default 30) is flagged right under
+the verdict.
 
 ## Data sources
 
@@ -124,7 +132,8 @@ always reported as unavailable.
 - **Bankruptcy details** (proceedings, creditors) are not covered — only the
   legal status from RPO. The insolvency register (REPLIK) is planned.
 - **IFRS reporters** — the register only has PDFs, so structured metrics are
-  reported as unavailable, never as zero.
+  reported as unavailable (never as zero), the verdict is ⚪ and the output
+  links the PDF attachments of the last 2 years.
 - **Sole traders with single-entry bookkeeping** use different statements and
   are not mapped yet.
 - **Tax debtors list has no IČO** — matching is by normalized name and

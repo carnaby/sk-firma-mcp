@@ -21,13 +21,13 @@ const deps = (over: Partial<DebtsDeps> = {}): DebtsDeps => ({
 });
 
 describe('fetchDebts', () => {
-  it('skladá všetkých veriteľov: FS exact match, SP dlžník, VšZP čistý, Union unavailable', async () => {
+  it('skladá všetkých veriteľov: FS exact match, SP dlžník, VšZP čistý, Union not_supported', async () => {
     const d = await fetchDebts('77777777', deps());
     expect(d.creditors.fs).toMatchObject({ status: 'debtor', amount_eur: 780, match_confidence: 'exact', as_of: '2026-05-31' });
     expect(d.creditors.sp).toMatchObject({ status: 'debtor', amount_eur: 47.71 });
     expect(d.creditors.vszp.status).toBe('not_found');
     expect(d.creditors.dovera.status).toBe('not_found');
-    expect(d.creditors.union.status).toBe('unavailable');
+    expect(d.creditors.union).toMatchObject({ status: 'not_supported', retryable: false });
     expect(d.total_known_debt_eur).toBe(827.71);
     expect(d.name).toBe('Firma Sedem s. r. o.');
   });

@@ -1,4 +1,6 @@
-export type Verdict = 'green' | 'orange' | 'red';
+// incomplete (⚪) = žiadny rizikový signál, ale kľúčová sekcia chýba alebo je len v PDF.
+// Neúplnosť dát nie je riziko — nikdy nezhorší verdikt na 🟠/🔴.
+export type Verdict = 'green' | 'orange' | 'red' | 'incomplete';
 
 export interface Flag {
   code: string;
@@ -29,7 +31,8 @@ export interface ProfileData {
   shareholders: { name: string }[];
   main_activity: { code: string; name: string } | null; // SK NACE (CL010579)
   source_register: string | null; // napr. "Obchodný register"
-  as_of: string | null;           // RPO dbModificationDate
+  as_of: string;                  // dátum živého dopytu do RPO (ISO) — údaje platia k tomuto dňu
+  record_modified_on: string | null; // RPO dbModificationDate — posledná zmena záznamu v registri
 }
 
 export interface SearchCandidate {
@@ -49,7 +52,7 @@ export interface FinancialYear {
   period_to: string;    // "2024-12"
   period_label: string; // "2024" alebo "2024-04..2025-03" (hospodársky rok)
   template: string;     // "mikro UJ" | "malá UJ" | "veľká UJ" | "malá/veľká UJ"
-  statement_id: number; // id výkazu pre skfirma_statement (Fáza 2) / PDF link
+  statement_id: number; // id účtovného výkazu v RÚZ (nie príloha — PDF je v pdf_attachments)
   revenue: number | null;
   profit: number | null;
   equity: number | null;
@@ -71,20 +74,45 @@ export interface FinancialsResult {
   name: string | null;
   years: FinancialYear[];
   unavailable_reason: FinancialsUnavailable | null; // null = OK; nastavené, keď years je prázdne
-  pdf_statement_ids: number[]; // IFRS/neverejné výkazy — odkaz na PDF
+  pdf_attachments: StatementAttachment[]; // PDF prílohy závierok bez štruktúrovaných dát (IFRS a pod.)
   as_of: string; // dátum dopytu (ISO)
+}
+
+export type AttachmentKind =
+  | 'financial_statements' // účtovná závierka
+  | 'auditor_report'       // správa audítora
+  | 'selected_data'        // vybrané údaje
+  | 'annual_report'        // výročná správa
+  | 'notes'                // poznámky
+  | 'approval_notice'      // oznámenie o dátume schválenia
+  | 'other';
+
+export interface StatementAttachment {
+  year: string;            // rok podľa konca obdobia závierky, napr. "2025"
+  period_to: string;       // "2025-12"
+  kind: AttachmentKind;
+  label: string;           // čitateľný typ, napr. "Účtovná závierka" (pri other názov šablóny RÚZ)
+  name: string;            // meno súboru v RÚZ
+  size_bytes: number | null;
+  attachment_id: number;
+  url: string;             // https://www.registeruz.sk/cruz-public/domain/financialreport/attachment/<id>
 }
 
 // --- Fáza 2a: dlhy a DPH ---
 
-export type CreditorStatus = 'debtor' | 'not_found' | 'unverifiable' | 'unavailable';
+// unavailable  = zdroj neodpovedal / chýba index (retryable podľa príčiny)
+// parse_error  = odpoveď prišla, ale nevieme ju prečítať (zmena formátu) — opakovanie nepomôže
+// not_supported = zdroj nemá verejné dáta (Union)
+// unverifiable = dáta sú, ale dlh sa nedá jednoznačne priradiť (FS bez IČO)
+export type CreditorStatus = 'debtor' | 'not_found' | 'unverifiable' | 'unavailable' | 'parse_error' | 'not_supported';
 
 export interface CreditorDebt {
   status: CreditorStatus;
   amount_eur: number | null;   // len pri status='debtor'
-  as_of: string | null;        // dátum stavu dát zdroja
+  as_of: string | null;        // dátum stavu dát zdroja (k akému dňu zdroj zoznam zverejnil)
   match_confidence?: 'exact' | 'high'; // len FS pri status='debtor'
-  note?: string;               // napr. dôvod unverifiable/unavailable
+  retryable?: boolean;         // pri unavailable/parse_error/not_supported: má zmysel skúsiť znova?
+  note?: string;               // ľudský popis dôvodu
 }
 
 export interface DebtsData {
@@ -113,4 +141,24 @@ export interface VatStatusData {
   erased: { published_on: string | null; erased_on: string | null; violation_year: string | null } | null;
   risky: { published_on: string | null; violation_year: string | null } | null;
   as_of: string | null;        // as_of datasetu vat_payers (resp. erased/risky pri zhode)
+}
+
+// --- úplnosť dát previerky (os nezávislá od rizika) ---
+
+export type SectionCompleteness = 'ok' | 'missing' | 'not_requested';
+export type FinancialsCompleteness = 'structured' | 'pdf_only' | 'unsupported' | 'no_statements' | 'missing' | 'not_requested';
+export type CreditorCompleteness = 'ok' | 'unavailable' | 'unverifiable' | 'parse_error' | 'not_supported';
+
+export interface Completeness {
+  profile: SectionCompleteness;
+  financials: FinancialsCompleteness;
+  debts: Record<keyof DebtsData['creditors'], CreditorCompleteness> | 'missing' | 'not_requested';
+  vat: SectionCompleteness;
+}
+
+/** Čerstvosť lokálneho indexu (dlhy, DPH). updated_at = najstaršie úspešné overenie datasetu. */
+export interface IndexFreshness {
+  updated_at: string | null; // ISO timestamp
+  age_days: number | null;
+  stale: boolean;            // starší ako CONFIG.index.staleDays
 }

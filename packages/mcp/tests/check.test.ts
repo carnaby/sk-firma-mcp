@@ -22,7 +22,7 @@ const healthyFin: FinancialsResult = {
   years: [{ period_from: '2024-01', period_to: '2024-12', period_label: '2024', template: 'mikro UJ', statement_id: 1,
     revenue: 1_388_372, profit: 7_791, equity: 78_955, assets: 1_060_405, liabilities: 981_450,
     liabilities_ratio: 0.9255, revenue_yoy: 0.05, negative_equity: false }],
-  unavailable_reason: null, pdf_statement_ids: [], as_of: '2026-07-12',
+  unavailable_reason: null, pdf_attachments: [], as_of: '2026-07-12',
 };
 
 async function call(d: Deps, args: Record<string, unknown>) {
@@ -70,7 +70,7 @@ describe('skfirma_check', () => {
     expect(res.content[0].text).toMatch(/presné IČO/);
   });
 
-  it('pád RÚZ → sekcia označená ⚠, verdikt max 🟠, ostatné sekcie prítomné', async () => {
+  it('pád RÚZ bez signálu → sekcia označená ⚠, verdikt ⚪ s dôvodom (nie 🟠), ostatné sekcie prítomné', async () => {
     const d: Deps = {
       rpo: { searchByIco: async () => candidate('11111111', 'Firma Jeden s. r. o.', 1000001),
              searchByName: async () => [], getEntity: async () => firma1Entity },
@@ -81,8 +81,10 @@ describe('skfirma_check', () => {
     };
     const res = await call(d, { ico: '11111111', sections: ['profile', 'financials'] });
     const md = res.content[0].text;
-    expect(md).toContain('⚠');
-    expect(md).toContain('🟠');
+    expect(md).toContain('⚠ Sekcia financials');
+    expect(md).toContain('⚪ NEDÁ SA POSÚDIŤ');
+    expect(md).not.toContain('🟠');
+    expect(md).toContain('**Dôvody:** Register účtovných závierok neodpovedal');
     expect(md).toContain('Firma Jeden s. r. o.');
   });
 

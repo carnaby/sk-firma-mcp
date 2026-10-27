@@ -7,7 +7,8 @@ export const CONFIG = {
   },
   ruz: {
     baseUrl: 'https://www.registeruz.sk/cruz-public/api',
-    pdfUrl: 'https://www.registeruz.sk/cruz-public/domain/financialreport/pdf', // + /<id-vykazu>
+    // PDF prílohy výkazov: /attachment/<id prílohy> (nie /pdf/<id výkazu> — to vracia 404)
+    attachmentUrl: 'https://www.registeruz.sk/cruz-public/domain/financialreport/attachment',
     timeoutMs: 10_000,
     cacheTtlMs: 24 * 3600_000,
   },
@@ -40,6 +41,8 @@ export const CONFIG = {
   },
   index: {
     path: process.env.SKFIRMA_INDEX_PATH ?? './data/skfirma-index.sqlite',
+    /** Index starší ako toľko dní → viditeľné varovanie v previerke (overuje sa podľa fetched_at, nie as_of zdroja). */
+    get staleDays() { return Number(process.env.SKFIRMA_INDEX_STALE_DAYS ?? 30); },
   },
   dovera: {
     // getter, nie snapshot — testy prepínajú cez process.env.SKFIRMA_DOVERA

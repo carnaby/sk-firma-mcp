@@ -22,7 +22,7 @@ const vatRows: VatRows = {
 function deps(over: Partial<Deps> = {}): Deps {
   return {
     rpo: { searchByIco: async () => candidate, searchByName: async () => [candidate], getEntity: async () => firma1Entity },
-    ruz: { financials: async () => ({ ico: '11111111', name: 'Firma Jeden s. r. o.', years: [], unavailable_reason: 'no_statements', pdf_statement_ids: [], as_of: '2026-07-13' }) },
+    ruz: { financials: async () => ({ ico: '11111111', name: 'Firma Jeden s. r. o.', years: [], unavailable_reason: 'no_statements', pdf_attachments: [], as_of: '2026-07-13' }) },
     index: {
       available: () => true,
       vatStatus: () => vatRows,
@@ -71,7 +71,7 @@ describe('skfirma_debts', () => {
     const res = await callTool(deps(), 'skfirma_debts', { ico: '11111111' });
     expect(res.isError).toBeFalsy();
     expect(res.content[0].text).toContain('4 812 €');
-    expect(res.content[0].text).toMatch(/Union.*nedostup|⚠ Union/i);
+    expect(res.content[0].text).toContain('| Union | nesledované |');
   });
   it('json vráti DebtsData tvar', async () => {
     const res = await callTool(deps(), 'skfirma_debts', { ico: '11111111', response_format: 'json' });
@@ -97,15 +97,20 @@ describe('skfirma_check so 4 sekciami', () => {
     expect(parsed.sources).toEqual(expect.arrayContaining(['FS OpenData', 'Sociálna poisťovňa']));
     expect(parsed.flags.map((f: { code: string }) => f.code)).toContain('debtor_major');
   });
-  it('index nedostupný → debts/vat sekcie ⚠, verdikt max 🟠, profil sa zobrazí', async () => {
+  it('index nedostupný bez signálu → ⚪ s dôvodmi (dlhy, DPH), profil sa zobrazí', async () => {
     const d = deps({ index: { available: () => false, vatStatus: () => null, spDebt: () => undefined, vszpDebt: () => undefined, taxDebtorCandidates: () => undefined, meta: () => null } });
     const res = await callTool(d, 'skfirma_check', { ico: '11111111' });
     const md = res.content[0].text;
-    expect(md).toContain('⚠');
-    expect(md).toContain('🟠');
+    expect(md).toContain('⚪ NEDÁ SA POSÚDIŤ');
+    expect(md).toContain('zoznamy dlžníkov FS, SP a VšZP nie sú dostupné (chýba lokálny index)');
+    expect(md).toContain('DPH status nie je dostupný');
     expect(md).toContain('Firma Jeden s. r. o.');
+    const json = JSON.parse((await callTool(d, 'skfirma_check', { ico: '11111111', response_format: 'json' })).content[0].text);
+    expect(json.verdict).toBe('incomplete');
+    expect(json.completeness).toMatchObject({ profile: 'ok', vat: 'missing', debts: { fs: 'unavailable', sp: 'unavailable', vszp: 'unavailable' } });
+    expect(json.incomplete_reasons.length).toBeGreaterThan(0);
   });
-  it('sections=[debts] + index nedostupný → 🟠 s ⚠, nikdy 🟢 (chýbajúci zdroj ≠ zelená)', async () => {
+  it('sections=[debts] + index nedostupný → ⚪ s ⚠, nikdy 🟢 (chýbajúci zdroj ≠ zelená)', async () => {
     const d = deps({
       index: { available: () => false, vatStatus: () => null, spDebt: () => undefined, vszpDebt: () => undefined, taxDebtorCandidates: () => undefined, meta: () => null },
       dovera: { lookup: async () => ({ status: 'unavailable', note: 'test' }) },
@@ -113,7 +118,7 @@ describe('skfirma_check so 4 sekciami', () => {
     const res = await callTool(d, 'skfirma_check', { ico: '11111111', sections: ['debts'] });
     const md = res.content[0].text;
     expect(md).not.toContain('🟢');
-    expect(md).toContain('🟠');
+    expect(md).toContain('⚪');
     expect(md).toContain('⚠');
   });
 });

@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.js';
-import type { CreditorDebt, DebtsData, FinancialsResult, ProfileData, SearchCandidate, VatStatusData } from '../types.js';
+import type { CreditorDebt, DebtsData, FinancialsResult, IndexFreshness, ProfileData, SearchCandidate, StatementAttachment, VatStatusData } from '../types.js';
 import type { RiskResult } from '../domain/risk.js';
 
 export function fmtEur(n: number | null): string {
@@ -14,7 +14,7 @@ export function fmtPct(ratio: number | null): string {
   return `${pct < 0 ? '−' : ''}${Math.abs(pct)} %`;
 }
 
-const VERDICT_LABEL = { red: '🔴 VYSOKÉ RIZIKO', orange: '🟠 ZVÝŠENÉ RIZIKO', green: '🟢 BEZ ZISTENÍ' } as const;
+const VERDICT_LABEL = { red: '🔴 VYSOKÉ RIZIKO', orange: '🟠 ZVÝŠENÉ RIZIKO', green: '🟢 BEZ ZISTENÍ', incomplete: '⚪ NEDÁ SA POSÚDIŤ (neúplné dáta)' } as const;
 const STATUS_LABEL: Record<ProfileData['status'], string> = {
   active: 'aktívna', in_liquidation: 'v likvidácii', in_bankruptcy: 'v konkurze',
   in_restructuring: 'v reštrukturalizácii', terminated: 'zaniknutá',
@@ -43,7 +43,7 @@ function identityLines(p: ProfileData): string {
     `**Identita:** ${p.legal_form ?? '?'}, ${p.address ?? 'adresa neznáma'}, vznik ${p.established_on ?? '?'}.`,
     p.executives.length ? `Štatutári: ${konatelia}${extra}.` : '',
     p.main_activity ? `Hlavná činnosť: ${p.main_activity.code} ${p.main_activity.name}.` : '',
-    `Stav: ${stav}. [RPO, ŠÚ SR, CC-BY 4.0, k ${p.as_of ?? '?'}]`,
+    `Stav: ${stav}. [RPO, ŠÚ SR, CC-BY 4.0; živý dopyt ${p.as_of}${p.record_modified_on ? `, posledná zmena záznamu v registri ${p.record_modified_on}` : ''}]`,
   ].filter(Boolean).join('\n');
 }
 
@@ -57,45 +57,80 @@ function financialsTable(f: FinancialsResult): string {
   return ['| Rok | Tržby | VH | Vlastné imanie | Zadlženosť |', '|---|---|---|---|---|', ...rows].join('\n');
 }
 
-export function renderFinancials(f: FinancialsResult): string {
+export function fmtSize(bytes: number | null): string {
+  if (bytes === null) return '';
+  return bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1000))} kB` : `${(bytes / 1_000_000).toFixed(1).replace('.', ',')} MB`;
+}
+
+/** PDF prílohy zoskupené podľa roku, najnovšie maxYears rokov (staršie cez parameter years). */
+function attachmentLines(atts: StatementAttachment[], maxYears: number): string[] {
+  const years = [...new Set(atts.map((a) => a.year))].sort().reverse();
+  const shown = years.slice(0, maxYears);
+  const lines = shown.map((y) => `- ${y}: ${atts.filter((a) => a.year === y)
+    .map((a) => `${a.label}${a.size_bytes !== null ? ` (${fmtSize(a.size_bytes)})` : ''} ${a.url}`).join(' · ')}`);
+  if (years.length > shown.length) lines.push(`- staršie roky (${years.slice(shown.length).join(', ')}) vynechané`);
+  return lines;
+}
+
+export function renderFinancials(f: FinancialsResult, opts: { maxAttachmentYears?: number } = {}): string {
+  const maxYears = opts.maxAttachmentYears ?? 2;
   if (f.years.length === 0) {
     const reason = {
-      ifrs_pdf_only: `Firma účtuje podľa IFRS — register poskytuje len PDF závierky, štruktúrované dáta nie sú dostupné. PDF: ${f.pdf_statement_ids.map((id) => `${CONFIG.ruz.pdfUrl}/${id}`).join(', ') || 'bez príloh'}.`,
-      unsupported_template: 'Výkazy sú v nepodporovanej sústave šablón (neziskovka/banka/JÚ) — štruktúrované metriky nedostupné.',
-      no_statements: 'Register neobsahuje žiadnu použiteľnú závierku.',
+      ifrs_pdf_only: 'štruktúrované dáta nie sú k dispozícii — závierka je len v PDF (IFRS). Čísla sú v prílohách:',
+      unsupported_template: 'výkazy sú v nepodporovanej sústave šablón (neziskovka/banka/JÚ) — štruktúrované metriky nedostupné.',
+      no_statements: 'register neobsahuje žiadnu použiteľnú závierku.',
       not_found: 'IČO nie je v Registri účtovných závierok.',
     }[f.unavailable_reason ?? 'no_statements'];
-    return `**Financie (RÚZ):** ${reason} [k ${f.as_of}]`;
+    const lines = [`**Financie (RÚZ, živý dopyt ${f.as_of}):** ${reason}`];
+    if (f.pdf_attachments.length) lines.push(...attachmentLines(f.pdf_attachments, maxYears));
+    return lines.join('\n');
   }
   const tpl = f.years[0].template;
-  return [`**Financie (RÚZ, ${tpl}, k ${f.as_of}):**`, financialsTable(f)].join('\n');
+  const lines = [`**Financie (RÚZ, ${tpl}, živý dopyt ${f.as_of}):**`, financialsTable(f)];
+  if (f.pdf_attachments.length) lines.push('PDF prílohy rokov bez štruktúrovaných dát:', ...attachmentLines(f.pdf_attachments, maxYears));
+  return lines.join('\n');
 }
 
 const CREDITOR_LABELS: Record<keyof DebtsData['creditors'], string> = {
   fs: 'Finančná správa', sp: 'Sociálna poisťovňa', vszp: 'VšZP', dovera: 'Dôvera', union: 'Union',
 };
 
+function creditorWarning(label: string, c: CreditorDebt): string | null {
+  const note = c.note ? ` ${c.note}` : '';
+  switch (c.status) {
+    case 'unavailable': return `⚠ ${label}: ${c.retryable ? 'dočasne nedostupné (skús neskôr).' : 'nedostupné.'}${note}`;
+    case 'parse_error': return `⚠ ${label}: chyba spracovania odpovede zdroja (nie dočasný výpadok, opakovanie nepomôže).${note}`;
+    case 'unverifiable': return `⚠ ${label}: nepodarilo sa jednoznačne overiť.${note}`;
+    case 'not_supported': return `${label}: nesledované.${note}`;
+    default: return null;
+  }
+}
+
 export function renderDebts(d: DebtsData): string {
   const entries = Object.entries(d.creditors) as [keyof DebtsData['creditors'], CreditorDebt][];
   const anyDebtor = entries.some(([, c]) => c.status === 'debtor');
-  const warnings = entries
-    .filter(([, c]) => c.status === 'unavailable' || c.status === 'unverifiable')
-    .map(([k, c]) => `⚠ ${CREDITOR_LABELS[k]}: ${c.status === 'unavailable' ? 'zdroj nedostupný' : 'nepodarilo sa jednoznačne overiť'}${c.note ? ` (${c.note})` : ''}.`);
+  const warnings = entries.map(([k, c]) => creditorWarning(CREDITOR_LABELS[k], c)).filter((w): w is string => w !== null);
 
   if (!anyDebtor) {
-    const zeros = entries.filter(([, c]) => c.status === 'not_found').map(([k]) => `${CREDITOR_LABELS[k]} 0 €`).join(', ');
-    return [`**Dlhy:** ${zeros || 'žiadny zdroj nedostupný'}.`, ...warnings].join('\n');
+    const zeros = entries.filter(([, c]) => c.status === 'not_found')
+      .map(([k, c]) => `${CREDITOR_LABELS[k]} 0 €${c.as_of ? ` (zoznam k ${c.as_of})` : ''}`).join(', ');
+    return [`**Dlhy:** ${zeros || 'žiadny zoznam dlžníkov nie je dostupný'}.`, ...warnings].join('\n');
   }
 
   const rows = entries.map(([k, c]) => {
-    const stav = { debtor: 'dlžník', not_found: 'bez dlhu', unverifiable: '⚠ neoverené', unavailable: '⚠ nedostupné' }[c.status];
+    const stav = {
+      debtor: 'dlžník', not_found: 'bez dlhu', unverifiable: '⚠ neoverené',
+      unavailable: c.retryable ? '⚠ dočasne nedostupné' : '⚠ nedostupné',
+      parse_error: '⚠ chyba spracovania', not_supported: 'nesledované',
+    }[c.status];
     const conf = c.match_confidence ? ` (${c.match_confidence === 'exact' ? 'zhoda adresy' : 'zhoda obce'})` : '';
     return `| ${CREDITOR_LABELS[k]} | ${stav}${conf} | ${fmtEur(c.amount_eur)} | ${c.as_of ?? '—'} |`;
   });
   return [
     `**Dlhy (spolu potvrdených ${fmtEur(d.total_known_debt_eur)}):**`,
-    '| Veriteľ | Stav | Suma | K dátumu |', '|---|---|---|---|', ...rows,
-    '_Prahy zverejnenia: FS > 170 €, SP ≥ 5 €, ZP > 100 €. Zoznamy nie sú realtime — pozri „K dátumu"._',
+    '| Veriteľ | Stav | Suma | Zoznam k |', '|---|---|---|---|', ...rows,
+    ...warnings.filter((w) => w.startsWith('⚠')),
+    '_Prahy zverejnenia: FS > 170 €, SP ≥ 5 €, ZP > 100 €. Zoznamy nie sú realtime — pozri „Zoznam k"._',
   ].join('\n');
 }
 
@@ -110,8 +145,16 @@ export function renderVatStatus(v: VatStatusData): string {
   }
   if (v.erased) lines.push(`🔴 Vymazaný platiteľ DPH (§52 ods. 8)${v.erased.erased_on ? `, vymazaný ${v.erased.erased_on}` : ''}.`);
   if (v.risky) lines.push(`🔴 V zozname rizikových platiteľov (§52 ods. 6)${v.risky.published_on ? `, zverejnený ${v.risky.published_on}` : ''}.`);
-  lines.push(`[FS OpenData, k ${v.as_of ?? '?'}]`);
+  lines.push(`[FS OpenData, zoznam k ${v.as_of ?? '?'}]`);
   return lines.join('\n');
+}
+
+export function renderIndexFreshness(f: IndexFreshness | null): string | null {
+  if (!f?.updated_at) return null;
+  const date = f.updated_at.slice(0, 10);
+  return f.stale
+    ? `⚠ **Lokálny index dlžníkov a DPH je starý ${f.age_days} dní** (naposledy aktualizovaný ${date}) — dlhy a DPH nemusia zodpovedať súčasnosti.`
+    : `_Lokálny index dlžníkov a DPH aktualizovaný ${date}._`;
 }
 
 export function renderCheck(input: {
@@ -122,17 +165,25 @@ export function renderCheck(input: {
   vat: VatStatusData | null;
   risk: RiskResult;
   failed_sections: string[];
+  index_freshness?: IndexFreshness | null;
 }): string {
   const { profile, financials, debts, vat, risk, failed_sections } = input;
   const name = profile?.name ?? financials?.name ?? 'Neznámy subjekt';
   const ico = input.ico ?? profile?.ico ?? financials?.ico ?? '?';
   const parts: string[] = [`## ${name} (IČO ${ico}) — verdikt: ${VERDICT_LABEL[risk.verdict]}`];
-  if (risk.flags.length) parts.push(`**Dôvody:** ${risk.flags.map((f) => `${f.detail} [${f.source}${f.as_of ? `, k ${f.as_of}` : ''}]`).join('; ')}.`);
+  if (risk.flags.length) {
+    parts.push(`**Dôvody:** ${risk.flags.map((f) => `${f.detail} [${f.source}${f.as_of ? `, k ${f.as_of}` : ''}]`).join('; ')}.`);
+    if (risk.incomplete.length) parts.push(`**Neúplné dáta** (verdikt nezhoršujú): ${risk.incomplete.join('; ')}.`);
+  } else if (risk.incomplete.length) {
+    parts.push(`**Dôvody:** ${risk.incomplete.join('; ')}. Žiadny rizikový signál sme nezistili, ale bez týchto dát sa firma nedá posúdiť.`);
+  }
+  const freshness = renderIndexFreshness(input.index_freshness ?? null);
+  if (freshness?.startsWith('⚠')) parts.push(freshness);
   if (profile) parts.push(identityLines(profile));
   if (financials) parts.push(renderFinancials(financials));
   if (debts) parts.push(renderDebts(debts));
   if (vat) parts.push(renderVatStatus(vat));
-  for (const note of risk.notes) parts.push(note);
+  if (freshness && !freshness.startsWith('⚠')) parts.push(freshness);
   for (const s of failed_sections) parts.push(`⚠ Sekcia ${s}: zdroj nedostupný.`);
   parts.push(`_${CONFIG.disclaimer}_`);
   return parts.join('\n\n');

@@ -70,6 +70,8 @@ export function buildDatabase(
   outPath: string,
   fresh: BuildInput,
   carryFromPath?: string,
+  /** Datasety, ktoré zdroj overil bez zmeny (HTTP 304): prenesú sa, ale fetched_at = tento beh. */
+  verified?: { datasets: DatasetName[]; fetchedAt: string },
 ): { written: DatasetName[]; carried: DatasetName[] } {
   const newPath = `${outPath}.new`;
   if (existsSync(newPath)) rmSync(newPath);
@@ -116,6 +118,10 @@ export function buildDatabase(
         carried.push(dataset);
       }
       db.exec('DETACH DATABASE old');
+      if (verified) {
+        const touch = db.prepare('UPDATE meta SET fetched_at = ? WHERE dataset = ?');
+        for (const d of verified.datasets) if (carried.includes(d)) touch.run(verified.fetchedAt, d);
+      }
     }
   } finally {
     db.close();

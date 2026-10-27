@@ -4,7 +4,7 @@ import { fetchJson } from '../http.js';
 import type { LruCache } from '../cache.js';
 import { extractMetrics, MAPPING, type RuzSablona, type RuzVykaz } from './ruz-mapping.js';
 import { buildYears, type YearInput } from '../domain/financials.js';
-import type { FinancialsResult, FinancialsUnavailable } from '../types.js';
+import type { AttachmentKind, FinancialsResult, FinancialsUnavailable, StatementAttachment } from '../types.js';
 
 // Zod schémy tolerantné: RÚZ vynecháva null atribúty a čísla vracia ako reťazce (S2 §2).
 const UnitLookup = z.object({ id: z.array(z.number()).default([]) });
@@ -30,6 +30,30 @@ function templateLabel(vykaz: RuzVykaz): string {
   return vykaz.idSablony === 687 ? 'mikro UJ' : 'malá/veľká UJ';
 }
 
+// Typ prílohy: najprv podľa názvu šablóny výkazu v RÚZ (autoritatívny), potom podľa
+// mena súboru (to si volí firma — napr. oznámenie o schválení sa volá „IFRS_OS_….pdf").
+const KINDS: { kind: AttachmentKind; label: string; re: RegExp }[] = [
+  { kind: 'auditor_report', label: 'Správa audítora', re: /spr[áa]va\s+(nez[áa]visl[ée]ho\s+)?aud[íi]tora/i },
+  { kind: 'annual_report', label: 'Výročná správa', re: /v[ýy]ro[čc]n[áa]\s+spr[áa]va/i },
+  { kind: 'selected_data', label: 'Vybrané údaje', re: /vybran[ée]\s+[úu]daje/i },
+  { kind: 'approval_notice', label: 'Oznámenie o schválení závierky', re: /ozn[áa]menie\s+o\s+d[áa]tume\s+schv[áa]lenia/i },
+  { kind: 'notes', label: 'Poznámky', re: /pozn[áa]mky/i },
+  { kind: 'financial_statements', label: 'Účtovná závierka', re: /[úu][čc]tovn[áa]\s+z[áa]vierka/i },
+];
+
+// Poradie v rámci roka: najprv samotná závierka, formality na koniec.
+const KIND_ORDER: AttachmentKind[] = ['financial_statements', 'auditor_report', 'annual_report', 'notes', 'selected_data', 'approval_notice', 'other'];
+const byYearAndKind = (a: StatementAttachment, b: StatementAttachment): number =>
+  b.year.localeCompare(a.year) || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind);
+
+export function classifyAttachment(name: string, templateName: string | null): { kind: AttachmentKind; label: string } {
+  for (const text of [templateName ?? '', name]) {
+    const hit = KINDS.find((k) => k.re.test(text));
+    if (hit) return { kind: hit.kind, label: hit.label };
+  }
+  return { kind: 'other', label: templateName ?? 'Iný dokument' };
+}
+
 export class RuzClient {
   constructor(private cache: LruCache<unknown>) {}
 
@@ -41,7 +65,7 @@ export class RuzClient {
   async financials(ico: string, years: number): Promise<FinancialsResult> {
     const asOf = new Date().toISOString().slice(0, 10);
     const empty = (reason: FinancialsUnavailable, name: string | null = null): FinancialsResult =>
-      ({ ico, name, years: [], unavailable_reason: reason, pdf_statement_ids: [], as_of: asOf });
+      ({ ico, name, years: [], unavailable_reason: reason, pdf_attachments: [], as_of: asOf });
 
     const lookup = UnitLookup.parse(await this.api(`/uctovne-jednotky?zmenene-od=2000-01-01&ico=${ico}`));
     if (lookup.id.length === 0) return empty('not_found');
@@ -70,22 +94,34 @@ export class RuzClient {
     if (vybrane.length === 0) return empty('no_statements', name);
 
     const yearInputs: YearInput[] = [];
-    const pdfIds: number[] = [];
+    const attachments: StatementAttachment[] = [];
     let sawPdfOnly = false;
     for (const zav of vybrane) {
       let structured: RuzVykaz | null = null;
-      const zavPdfIds: number[] = [];
+      const pdfVykazy: RuzVykaz[] = [];
       for (const vid of zav.idUctovnychVykazov) {
         const vykaz = (await this.api(`/uctovny-vykaz?id=${vid}`)) as RuzVykaz;
         if (MAPPING[vykaz.idSablony] && (vykaz.obsah?.tabulky ?? []).some((t) => (t.data ?? []).length > 0)) {
           structured = { ...vykaz, id: vykaz.id ?? vid };
           break;
         }
-        if ((vykaz.prilohy ?? []).length > 0) zavPdfIds.push(vykaz.id ?? vid);
+        if ((vykaz.prilohy ?? []).length > 0) pdfVykazy.push(vykaz);
       }
       if (!structured) {
-        pdfIds.push(...zavPdfIds);
-        if (zavPdfIds.length > 0) sawPdfOnly = true;
+        if (pdfVykazy.length > 0) sawPdfOnly = true;
+        const periodTo = zav.obdobieDo ?? '';
+        for (const vykaz of pdfVykazy) {
+          for (const p of vykaz.prilohy ?? []) {
+            if (typeof p.id !== 'number') continue;
+            const name = p.meno ?? `príloha ${p.id}`;
+            const kind = classifyAttachment(name, await this.templateName(vykaz.idSablony));
+            attachments.push({
+              year: periodTo.slice(0, 4), period_to: periodTo, kind: kind.kind, label: kind.label, name,
+              size_bytes: typeof p.velkostPrilohy === 'number' ? p.velkostPrilohy : null,
+              attachment_id: p.id, url: `${CONFIG.ruz.attachmentUrl}/${p.id}`,
+            });
+          }
+        }
         continue;
       }
       const sablona = (await this.api(`/sablona?id=${structured.idSablony}`, 7 * 24 * 3600_000)) as RuzSablona;
@@ -100,9 +136,20 @@ export class RuzClient {
       });
     }
 
+    attachments.sort(byYearAndKind);
     if (yearInputs.length === 0) {
-      return { ico, name, years: [], unavailable_reason: sawPdfOnly ? 'ifrs_pdf_only' : 'unsupported_template', pdf_statement_ids: pdfIds, as_of: asOf };
+      return { ico, name, years: [], unavailable_reason: sawPdfOnly ? 'ifrs_pdf_only' : 'unsupported_template', pdf_attachments: attachments, as_of: asOf };
     }
-    return { ico, name, years: buildYears(yearInputs), unavailable_reason: null, pdf_statement_ids: pdfIds, as_of: asOf };
+    return { ico, name, years: buildYears(yearInputs), unavailable_reason: null, pdf_attachments: attachments, as_of: asOf };
+  }
+
+  /** Názov šablóny výkazu (napr. „Správa audítora") — fallback pri type prílohy. Zlyhanie nie je chyba. */
+  private async templateName(idSablony: number): Promise<string | null> {
+    try {
+      const t = (await this.api(`/sablona?id=${idSablony}`, 7 * 24 * 3600_000)) as { nazov?: string };
+      return t.nazov ?? null;
+    } catch {
+      return null;
+    }
   }
 }

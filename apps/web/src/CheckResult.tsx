@@ -1,12 +1,39 @@
 import { useState } from 'react';
-import type { CheckReportJson, CreditorDebt, Verdict } from '@skfirma/core';
+import type { CheckReportJson, CreditorDebt, StatementAttachment, Verdict } from '@skfirma/core';
 import { fmtDate, fmtEur, fmtPct } from './format';
 
 const VERDICT: Record<Verdict, { label: string; icon: string; hint: string }> = {
   green: { label: 'Bez zistení', icon: '🟢', hint: 'Žiadne z kontrolovaných rizikových pravidiel sa nespustilo.' },
   orange: { label: 'Zvýšené riziko', icon: '🟠', hint: 'Niečo stojí za pozornosť — pozri dôvody nižšie.' },
   red: { label: 'Vysoké riziko', icon: '🔴', hint: 'Aspoň jedno závažné zistenie.' },
+  incomplete: { label: 'Nedá sa posúdiť', icon: '⚪', hint: 'Žiadny rizikový signál sme nezistili, ale chýbajú kľúčové dáta — neúplnosť nie je riziko.' },
 };
+
+function fmtSize(bytes: number | null): string {
+  if (bytes === null) return '';
+  return bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1000))} kB` : `${(bytes / 1_000_000).toFixed(1).replace('.', ',')} MB`;
+}
+
+/** PDF prílohy z RÚZ, najnovšie 2 roky. */
+function Attachments({ items }: { items: StatementAttachment[] }) {
+  const years = [...new Set(items.map((a) => a.year))].sort().reverse().slice(0, 2);
+  return (
+    <ul className="attachments">
+      {years.map((y) => (
+        <li key={y}>
+          <strong>{y}:</strong>{' '}
+          {items.filter((a) => a.year === y).map((a, i) => (
+            <span key={a.attachment_id}>
+              {i > 0 && ' · '}
+              <a href={a.url} rel="noreferrer">{a.label}</a>
+              {a.size_bytes !== null && <span className="src"> ({fmtSize(a.size_bytes)})</span>}
+            </span>
+          ))}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'aktívna',
@@ -40,9 +67,13 @@ function creditorCell(c: CreditorDebt) {
     case 'not_found':
       return <span className="pill green">nie je v zozname</span>;
     case 'unverifiable':
-      return <span className="pill orange" title={c.note}>nedá sa overiť</span>;
+      return <span className="pill grey" title={c.note}>nedá sa jednoznačne overiť</span>;
+    case 'parse_error':
+      return <span className="pill grey" title={c.note}>chyba spracovania zdroja</span>;
+    case 'not_supported':
+      return <span className="pill grey" title={c.note}>nesledované</span>;
     default:
-      return <span className="pill grey" title={c.note}>zdroj nedostupný</span>;
+      return <span className="pill grey" title={c.note}>{c.retryable ? 'dočasne nedostupné' : 'zdroj nedostupný'}</span>;
   }
 }
 
@@ -86,14 +117,31 @@ export function CheckResult({ report, markdown }: { report: CheckReportJson; mar
                 ))}
               </ul>
             </section>
+          ) : report.incomplete_reasons.length > 0 ? (
+            <section>
+              <h3>Prečo sa nedá posúdiť</h3>
+              <ul className="flags">
+                {report.incomplete_reasons.map((r) => <li key={r}>{r}</li>)}
+              </ul>
+              <p className="muted small">{v.hint}</p>
+            </section>
           ) : (
             <p className="muted">{v.hint}</p>
           )}
 
-          {(report.notes.length > 0 || report.failed_sections.length > 0) && (
+          {report.index_freshness?.stale && (
+            <div className="notice">
+              ⚠ Lokálny index dlžníkov a DPH je starý {report.index_freshness.age_days} dní
+              (naposledy aktualizovaný {fmtDate(report.index_freshness.updated_at!.slice(0, 10))}) — dlhy a DPH nemusia zodpovedať súčasnosti.
+            </div>
+          )}
+
+          {((report.flags.length > 0 && report.incomplete_reasons.length > 0) || report.failed_sections.length > 0) && (
             <div className="notice">
               {report.failed_sections.map((s) => <div key={s}>⚠ {SECTION_LABEL[s] ?? s}: zdroj momentálne nedostupný.</div>)}
-              {report.notes.map((n) => <div key={n}>{n}</div>)}
+              {report.flags.length > 0 && report.incomplete_reasons.length > 0 && (
+                <div>Neúplné dáta (verdikt nezhoršujú): {report.incomplete_reasons.join('; ')}.</div>
+              )}
             </div>
           )}
 
@@ -115,7 +163,7 @@ export function CheckResult({ report, markdown }: { report: CheckReportJson; mar
                 )}
                 {p.shareholders.length > 0 && (<><dt>Spoločníci</dt><dd>{p.shareholders.map((s) => s.name).join(', ')}</dd></>)}
               </dl>
-              <p className="src">RPO, ŠÚ SR{p.as_of ? `, k ${fmtDate(p.as_of)}` : ''}</p>
+              <p className="src">RPO, ŠÚ SR · živý dopyt {fmtDate(p.as_of)}{p.record_modified_on ? ` · posledná zmena záznamu v registri ${fmtDate(p.record_modified_on)}` : ''}</p>
             </section>
           )}
 
@@ -146,6 +194,12 @@ export function CheckResult({ report, markdown }: { report: CheckReportJson; mar
                 {report.financials_unavailable_reason ? FIN_UNAVAILABLE[report.financials_unavailable_reason] : 'Údaje nie sú k dispozícii.'}
               </p>
             )}
+            {report.pdf_attachments.length > 0 && (
+              <>
+                <p className="muted small">PDF prílohy z Registra účtovných závierok (stiahnu sa ako súbor):</p>
+                <Attachments items={report.pdf_attachments} />
+              </>
+            )}
           </section>
 
           {report.debts && (
@@ -159,7 +213,7 @@ export function CheckResult({ report, markdown }: { report: CheckReportJson; mar
                       <tr key={key}>
                         <th>{label}</th>
                         <td>{creditorCell(c)}</td>
-                        <td className="src">{c.as_of ? `k ${fmtDate(c.as_of)}` : ''}</td>
+                        <td className="src">{c.as_of ? `zoznam k ${fmtDate(c.as_of)}` : ''}</td>
                       </tr>
                     );
                   })}
@@ -181,7 +235,7 @@ export function CheckResult({ report, markdown }: { report: CheckReportJson; mar
               </p>
               {report.vat.erased && <p className="neg">Vymazaný platiteľ (§52 ods. 8){report.vat.erased.erased_on ? `, ${fmtDate(report.vat.erased.erased_on)}` : ''}</p>}
               {report.vat.risky && <p className="neg">V zozname rizikových platiteľov (§52 ods. 6){report.vat.risky.published_on ? `, zverejnený ${fmtDate(report.vat.risky.published_on)}` : ''}</p>}
-              <p className="src">FS OpenData{report.vat.as_of ? `, k ${fmtDate(report.vat.as_of)}` : ''}</p>
+              <p className="src">FS OpenData{report.vat.as_of ? `, zoznam k ${fmtDate(report.vat.as_of)}` : ''}</p>
             </section>
           )}
 

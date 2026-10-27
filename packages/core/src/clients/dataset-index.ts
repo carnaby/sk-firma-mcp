@@ -56,6 +56,14 @@ export class DatasetIndex {
     this.openedMtime = 0;
   }
 
+  /** Najstarší čas úspešného overenia datasetu (fetched_at) — podľa neho sa hodnotí, či je index starý. */
+  oldestFetchedAt(): string | null {
+    const db = this.open();
+    if (!db) return null;
+    const row = db.prepare('SELECT MIN(fetched_at) AS t FROM meta').get() as unknown as { t: string | null } | undefined;
+    return row?.t ?? null;
+  }
+
   meta(dataset: DatasetName): MetaRow | null {
     const db = this.open();
     if (!db) return null;

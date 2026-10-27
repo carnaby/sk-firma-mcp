@@ -13,7 +13,7 @@ export interface DebtsDeps {
 }
 
 const INGEST_NOTE = 'Lokálny index neexistuje — spusti `pnpm ingest`.';
-const unavailable = (note: string): CreditorDebt => ({ status: 'unavailable', amount_eur: null, as_of: null, note });
+const unavailable = (note: string, retryable = false): CreditorDebt => ({ status: 'unavailable', amount_eur: null, as_of: null, retryable, note });
 
 function fromDebtSum(result: { amount_eur: number; as_of: string } | null | undefined): CreditorDebt {
   if (result === undefined) return unavailable(INGEST_NOTE);
@@ -57,14 +57,15 @@ export async function fetchDebts(ico: string, deps: DebtsDeps): Promise<DebtsDat
   const vszp = fromDebtSum(deps.index.vszpDebt(ico));
 
   const doveraResult = await deps.dovera.lookup(ico);
-  const dovera: CreditorDebt =
-    doveraResult.status === 'debtor'
-      ? { status: 'debtor', amount_eur: doveraResult.amount_eur, as_of: doveraResult.as_of }
-      : doveraResult.status === 'not_found'
-        ? { status: 'not_found', amount_eur: null, as_of: doveraResult.as_of }
-        : unavailable(doveraResult.note);
+  let dovera: CreditorDebt;
+  switch (doveraResult.status) {
+    case 'debtor': dovera = { status: 'debtor', amount_eur: doveraResult.amount_eur, as_of: doveraResult.as_of }; break;
+    case 'not_found': dovera = { status: 'not_found', amount_eur: null, as_of: doveraResult.as_of }; break;
+    case 'parse_error': dovera = { status: 'parse_error', amount_eur: null, as_of: null, retryable: false, note: doveraResult.note }; break;
+    default: dovera = unavailable(doveraResult.note, doveraResult.retryable);
+  }
 
-  const union = unavailable('Union nemá verejný export (v1.1).');
+  const union: CreditorDebt = { status: 'not_supported', amount_eur: null, as_of: null, retryable: false, note: 'Union nemá verejný zoznam dlžníkov.' };
 
   const creditors = { fs, sp, vszp, dovera, union };
   const total = Object.values(creditors)

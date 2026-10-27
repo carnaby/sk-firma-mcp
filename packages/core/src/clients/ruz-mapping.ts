@@ -13,7 +13,7 @@ export interface RuzVykaz {
   id?: number;
   idSablony: number;
   pristupnostDat?: string;
-  prilohy?: { id?: number; meno?: string }[];
+  prilohy?: { id?: number; meno?: string; velkostPrilohy?: number; mimeType?: string; digest?: string }[];
   obsah?: {
     titulnaStrana?: {
       ico?: string;

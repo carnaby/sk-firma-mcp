@@ -14,7 +14,7 @@ const firma1Candidate: SearchCandidate = {
 };
 const emptyFin: FinancialsResult = {
   ico: '11111111', name: 'Firma Jeden s. r. o.', years: [], unavailable_reason: 'no_statements',
-  pdf_statement_ids: [], as_of: '2026-07-12',
+  pdf_attachments: [], as_of: '2026-07-12',
 };
 
 function deps(over: Partial<Deps> = {}): Deps {

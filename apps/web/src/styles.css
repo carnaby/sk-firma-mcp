@@ -129,10 +129,13 @@ h3 { font-size: 1.05rem; }
 .verdict.green { background: var(--green-bg); }
 .verdict.orange { background: var(--orange-bg); }
 .verdict.red { background: var(--red-bg); }
+.verdict.incomplete { background: var(--grey-bg); }
 .verdict-label { font-weight: 700; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .verdict.green .verdict-label { color: var(--green); }
 .verdict.orange .verdict-label { color: var(--orange); }
 .verdict.red .verdict-label { color: var(--red); }
+.verdict.incomplete .verdict-label { color: var(--muted); }
+.attachments { margin: 4px 0 0; padding-left: 18px; line-height: 1.7; }
 .tabs { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
 .tabs button { font: inherit; font-size: 0.875rem; border: 0; background: none; color: var(--muted); padding: 6px 12px; border-radius: 7px; cursor: pointer; }
 .tabs button[aria-selected='true'] { background: var(--surface-2); color: var(--text); font-weight: 600; }

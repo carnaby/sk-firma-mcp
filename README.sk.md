@@ -6,7 +6,7 @@
 
 Prever si slovenskú firmu podľa IČO alebo názvu: identita z registra,
 účtovné závierky, dlhy voči štátu a poisťovniam, DPH status a
-deterministický rizikový verdikt 🟢/🟠/🔴. Na webe so živým testom aj ako
+deterministický rizikový verdikt 🟢/🟠/🔴 (⚪, keď chýbajú kľúčové dáta). Na webe so živým testom aj ako
 MCP konektor pre Claude a iné AI klientov.
 
 Žiadny scraping RPO/RÚZ, žiadne ML skórovanie — live dopyty na oficiálne API
@@ -296,7 +296,7 @@ spoločníci, SK NACE.
 **Identita:** Spoločnosť s ručením obmedzeným, Vzorová 123/4, 81101 Bratislava - mestská časť Staré Mesto, vznik 2018-01-02.
 Štatutári: Ing. Ján Vzorový (od 2018), Mgr. Eva Vzorová (od 2021).
 Hlavná činnosť: 6210 Počítačové programovanie.
-Stav: aktívna. [RPO, ŠÚ SR, CC-BY 4.0, k 2026-06-30]
+Stav: aktívna. [RPO, ŠÚ SR, CC-BY 4.0; živý dopyt 2026-07-12, posledná zmena záznamu v registri 2026-06-30]
 ```
 
 **2. „Je firma s IČO 55555555 stále aktívna?“**
@@ -310,7 +310,7 @@ Stav: aktívna. [RPO, ŠÚ SR, CC-BY 4.0, k 2026-06-30]
 **Identita:** Spoločnosť s ručením obmedzeným, Vzorová 45/6, 82101 Bratislava - mestská časť Ružinov, vznik 1993-04-05.
 Štatutári: Ing. Peter Vzorový (od 1998).
 Hlavná činnosť: 4683 Veľkoobchod s drevom, stavebným materiálom a sanitárnymi zariadeniami.
-Stav: v likvidácii od 2005-06-07. [RPO, ŠÚ SR, CC-BY 4.0, k 2026-06-30]
+Stav: v likvidácii od 2005-06-07. [RPO, ŠÚ SR, CC-BY 4.0; živý dopyt 2026-07-12, posledná zmena záznamu v registri 2026-06-30]
 ```
 
 **3. „Daj mi profil Firma Jeden ako JSON, nech si viem naprogramovať ďalšie spracovanie“**
@@ -336,7 +336,7 @@ tržieb za posledné roky (RÚZ). Nevracia surové výkazy — len odvodené met
 { "name": "skfirma_financials", "arguments": { "ico": "11111111", "years": 3 } }
 ```
 ```
-**Financie (RÚZ, mikro UJ, k 2026-07-12):**
+**Financie (RÚZ, mikro UJ, živý dopyt 2026-07-12):**
 | Rok | Tržby | VH | Vlastné imanie | Zadlženosť |
 |---|---|---|---|---|
 | 2025 | 1 234 567 € | 12 345 € | 80 000 € | 92 % |
@@ -350,7 +350,7 @@ tržieb za posledné roky (RÚZ). Nevracia surové výkazy — len odvodené met
 { "name": "skfirma_financials", "arguments": { "ico": "11111111", "years": 5 } }
 ```
 ```
-**Financie (RÚZ, mikro UJ, k 2026-07-12):**
+**Financie (RÚZ, mikro UJ, živý dopyt 2026-07-12):**
 | Rok | Tržby | VH | Vlastné imanie | Zadlženosť |
 |---|---|---|---|---|
 | 2025 | 1 234 567 € | 12 345 € | 80 000 € | 92 % |
@@ -360,13 +360,13 @@ tržieb za posledné roky (RÚZ). Nevracia surové výkazy — len odvodené met
 | 2021 | 800 000 € | 8 000 € | 50 000 € | 69 % |
 ```
 
-**3. „Potrebujem aj ID výkazov, chcem si dopočítať PDF odkaz“**
+**3. „Potrebujem aj ID účtovných výkazov v RÚZ“**
 
 ```json
 { "name": "skfirma_financials", "arguments": { "ico": "11111111", "include_statement_ids": true } }
 ```
 ```
-**Financie (RÚZ, mikro UJ, k 2026-07-12):**
+**Financie (RÚZ, mikro UJ, živý dopyt 2026-07-12):**
 | Rok | Tržby | VH | Vlastné imanie | Zadlženosť |
 |---|---|---|---|---|
 | 2025 | 1 234 567 € | 12 345 € | 80 000 € | 92 % |
@@ -378,8 +378,10 @@ Statement IDs: 9000001 (2025), 9000002 (2024), 9000003 (2023)
 ### `skfirma_debts` — dlhy voči štátu a poisťovniam
 
 Finančná správa (daňoví dlžníci), Sociálna poisťovňa, VšZP a Dôvera per
-IČO; Union nemá verejný export, vždy vráti `unavailable`. Vyžaduje lokálny
-index (`pnpm ingest`).
+IČO; Union nemá verejný export, vždy vráti `not_supported`. Vyžaduje lokálny
+index (`pnpm ingest`). Nedostupný zdroj má stav `unavailable` s príznakom
+`retryable` (dočasný výpadok — skús neskôr), nečitateľná odpoveď `parse_error`
+(zmena formátu zdroja — opakovanie nepomôže).
 
 _Príklady sú ilustračné s anonymizovanými údajmi._
 
@@ -391,9 +393,9 @@ _Príklady sú ilustračné s anonymizovanými údajmi._
 ```
 ## Firma Jeden s. r. o. (IČO 11111111)
 
-**Dlhy:** Finančná správa 0 €, Sociálna poisťovňa 0 €, VšZP 0 €.
-⚠ Dôvera: zdroj nedostupný (dočasne nedostupný, skús neskôr).
-⚠ Union: zdroj nedostupný (Union nemá verejný export (v1.1)).
+**Dlhy:** Finančná správa 0 € (zoznam k 2026-05-31), Sociálna poisťovňa 0 € (zoznam k 2026-07-13), VšZP 0 € (zoznam k 2026-07-12).
+⚠ Dôvera: dočasne nedostupné (skús neskôr). Dôvera odpovedala HTTP 429 — skús neskôr.
+Union: nesledované. Union nemá verejný zoznam dlžníkov.
 ```
 
 **2. „Prever dlhy firmy Firma Šesť, IČO 66666666“**
@@ -405,14 +407,14 @@ _Príklady sú ilustračné s anonymizovanými údajmi._
 ## Firma Šesť a. s. (IČO 66666666)
 
 **Dlhy (spolu potvrdených 128 000 €):**
-| Veriteľ | Stav | Suma | K dátumu |
+| Veriteľ | Stav | Suma | Zoznam k |
 |---|---|---|---|
 | Finančná správa | dlžník (zhoda adresy) | 13 000 € | 2026-05-31 |
 | Sociálna poisťovňa | dlžník | 100 000 € | 2026-07-13 |
 | VšZP | dlžník | 15 000 € | 2026-07-12 |
-| Dôvera | ⚠ nedostupné | — | — |
-| Union | ⚠ nedostupné | — | — |
-_Prahy zverejnenia: FS > 170 €, SP ≥ 5 €, ZP > 100 €. Zoznamy nie sú realtime — pozri „K dátumu"._
+| Dôvera | ⚠ dočasne nedostupné | — | — |
+| Union | nesledované | — | — |
+_Prahy zverejnenia: FS > 170 €, SP ≥ 5 €, ZP > 100 €. Zoznamy nie sú realtime — pozri „Zoznam k"._
 ```
 
 **3. „Chcem strojovo spracovateľný výstup dlhov firmy Firma Jeden“**
@@ -421,7 +423,7 @@ _Prahy zverejnenia: FS > 170 €, SP ≥ 5 €, ZP > 100 €. Zoznamy nie sú re
 { "name": "skfirma_debts", "arguments": { "ico": "11111111", "response_format": "json" } }
 ```
 ```json
-{"ico":"11111111","name":"Firma Jeden s. r. o.","creditors":{"fs":{"status":"not_found","amount_eur":null,"as_of":"2026-05-31"},"sp":{"status":"not_found","amount_eur":null,"as_of":"2026-07-13"},"vszp":{"status":"not_found","amount_eur":null,"as_of":"2026-07-12"},"dovera":{"status":"unavailable","amount_eur":null,"as_of":null,"note":"..."},"union":{"status":"unavailable","amount_eur":null,"as_of":null,"note":"Union nemá verejný export (v1.1)."}},"total_known_debt_eur":0,"notes":[]}
+{"ico":"11111111","name":"Firma Jeden s. r. o.","creditors":{"fs":{"status":"not_found","amount_eur":null,"as_of":"2026-05-31"},"sp":{"status":"not_found","amount_eur":null,"as_of":"2026-07-13"},"vszp":{"status":"not_found","amount_eur":null,"as_of":"2026-07-12"},"dovera":{"status":"unavailable","amount_eur":null,"as_of":null,"retryable":true,"note":"..."},"union":{"status":"not_supported","amount_eur":null,"as_of":null,"retryable":false,"note":"Union nemá verejný zoznam dlžníkov."}},"total_known_debt_eur":0,"notes":[]}
 ```
 
 ### `skfirma_vat_status` — registrácia pre DPH
@@ -439,7 +441,7 @@ _Príklady sú ilustračné s anonymizovanými údajmi._
 ```
 ```
 **DPH:** platiteľ (§4, od 2020-01-01), IČ DPH SK1111111111.
-[FS OpenData, k 2026-07-13]
+[FS OpenData, zoznam k 2026-07-13]
 ```
 
 **2. „Over DPH podľa IČ DPH SK6666666666“**
@@ -450,7 +452,7 @@ _Príklady sú ilustračné s anonymizovanými údajmi._
 ```
 **DPH:** platiteľ (§4, od 2005-01-01), IČ DPH SK6666666666.
 🔴 V zozname rizikových platiteľov (§52 ods. 6), zverejnený 2024-05-01.
-[FS OpenData, k 2026-07-13]
+[FS OpenData, zoznam k 2026-07-13]
 ```
 
 **3. „Chcem JSON výstup DPH statusu pre Firma Dva“**
@@ -466,9 +468,37 @@ _Príklady sú ilustračné s anonymizovanými údajmi._
 
 Hlavný nástroj. Jedno volanie skombinuje RPO, RÚZ, lokálny index dlžníkov a
 DPH status a vráti deterministický verdikt 🟢 bez zistení / 🟠 zvýšené
-riziko / 🔴 vysoké riziko s dôvodmi a zdrojmi. Zadaj `ico` alebo `name`
-(nikdy oboje). Parametrom `sections` je možné vybrať len časť zo štyroch
-sekcií (`profile`, `financials`, `debts`, `vat`), default sú všetky štyri.
+riziko / 🔴 vysoké riziko / ⚪ nedá sa posúdiť, vždy s dôvodmi a zdrojmi.
+Zadaj `ico` alebo `name` (nikdy oboje). Parametrom `sections` je možné vybrať
+len časť zo štyroch sekcií (`profile`, `financials`, `debts`, `vat`), default
+sú všetky štyri.
+
+**Pravidlá verdiktu** (worst-of, bez váh a skóre; prahy v
+[`packages/core/src/config.ts`](packages/core/src/config.ts)):
+
+| Flag | Podmienka | Verdikt |
+|---|---|---|
+| `terminated` | subjekt zaniknutý | 🔴 |
+| `insolvency` | konkurz, reštrukturalizácia alebo likvidácia (právny stav v RPO) | 🔴 |
+| `vat_erased_52_8` | vymazaný platiteľ DPH (§52 ods. 8) | 🔴 |
+| `vat_risky_52_6` | v zozname rizikových platiteľov DPH (§52 ods. 6) | 🔴 |
+| `debtor_major` | dlh FS + SP + ZP spolu > 1 000 € | 🔴 |
+| `negative_equity` | vlastné imanie < 0 v poslednej závierke | 🔴 |
+| `debtor_minor` | dlh > 0 a ≤ 1 000 € | 🟠 |
+| `no_recent_statements` | žiadna závierka za posledné 2 uzavreté obdobia | 🟠 |
+| `revenue_drop` | tržby medziročne < −30 % | 🟠 |
+| `young_company` | vznik pred menej ako 24 mesiacmi | 🟠 |
+| `high_leverage` | záväzky / aktíva > 90 % | 🟠 |
+| — | žiadny flag a všetky kľúčové sekcie k dispozícii | 🟢 |
+| — | žiadny flag, ale kľúčová sekcia chýba (financie len v PDF/IFRS, register neodpovedal, chýba lokálny index, FS dlh sa nedá priradiť, sekcia nevyžiadaná) | ⚪ |
+
+Riziko a úplnosť dát sú dve osi: **neúplnosť dát nie je riziko**. Chýbajúci
+zdroj nikdy nezhorší verdikt na 🟠/🔴 — pri zistenom signáli je neúplnosť len
+poznámka, bez signálu je verdikt ⚪ s dôvodmi. Nedostupná Dôvera ani Union
+verdikt nemenia. Každý verdikt okrem 🟢 má aspoň jeden dôvod. JSON výstup
+nesie `completeness` (stav každej sekcie a veriteľa) a `index_freshness`;
+ak je lokálny index starší ako `SKFIRMA_INDEX_STALE_DAYS` (default 30 dní),
+výstup to viditeľne hlási hneď pod verdiktom.
 
 **1. „Prever Firma Jeden pred podpisom kontraktu“**
 
@@ -483,9 +513,9 @@ sekcií (`profile`, `financials`, `debts`, `vat`), default sú všetky štyri.
 **Identita:** Spoločnosť s ručením obmedzeným, Vzorová 123/4, 81101 Bratislava - mestská časť Staré Mesto, vznik 2018-01-02.
 Štatutári: Ing. Ján Vzorový (od 2018), Mgr. Eva Vzorová (od 2021).
 Hlavná činnosť: 6210 Počítačové programovanie.
-Stav: aktívna. [RPO, ŠÚ SR, CC-BY 4.0, k 2026-06-30]
+Stav: aktívna. [RPO, ŠÚ SR, CC-BY 4.0; živý dopyt 2026-07-12, posledná zmena záznamu v registri 2026-06-30]
 
-**Financie (RÚZ, mikro UJ, k 2026-07-12):**
+**Financie (RÚZ, mikro UJ, živý dopyt 2026-07-12):**
 | Rok | Tržby | VH | Vlastné imanie | Zadlženosť |
 |---|---|---|---|---|
 | 2025 | 1 234 567 € | 12 345 € | 80 000 € | 92 % |
@@ -493,11 +523,11 @@ Stav: aktívna. [RPO, ŠÚ SR, CC-BY 4.0, k 2026-06-30]
 | 2023 | 1 000 000 € | 10 000 € | 60 000 € | 79 % |
 
 **Dlhy:** Finančná správa 0 €, Sociálna poisťovňa 0 €, VšZP 0 €.
-⚠ Dôvera: zdroj nedostupný (dočasne nedostupný, skús neskôr).
-⚠ Union: zdroj nedostupný (Union nemá verejný export (v1.1)).
+⚠ Dôvera: dočasne nedostupné (skús neskôr). Dôvera odpovedala HTTP 429 — skús neskôr.
+Union: nesledované. Union nemá verejný zoznam dlžníkov.
 
 **DPH:** platiteľ (§4, od 2020-01-01), IČ DPH SK1111111111.
-[FS OpenData, k 2026-07-13]
+[FS OpenData, zoznam k 2026-07-13]
 
 _Informatívny výstup z verejných registrov, nie úverový rating ani právne posúdenie._
 ```
@@ -522,7 +552,7 @@ do CRM)“**
 { "name": "skfirma_check", "arguments": { "ico": "11111111", "response_format": "json" } }
 ```
 ```json
-{"ico":"11111111","verdict":"orange","flags":[{"code":"high_leverage","detail":"zadlženosť 92 % (2025)","as_of":"2026-07-12","source":"registeruz.sk"}],"profile":{"...": "..."},"financials":[{"...": "..."}],"financials_unavailable_reason":null,"debts":{"...": "..."},"vat":{"...": "..."},"notes":[],"failed_sections":[],"sources":["RPO (CC-BY 4.0, ŠÚ SR)","RÚZ (MF SR)","FS OpenData","Sociálna poisťovňa","VšZP (Datahub)","Dôvera"],"disclaimer":"Informatívny výstup z verejných registrov, nie úverový rating ani právne posúdenie."}
+{"ico":"11111111","verdict":"orange","flags":[{"code":"high_leverage","detail":"zadlženosť 92 % (2025)","as_of":"2026-07-12","source":"registeruz.sk"}],"incomplete_reasons":[],"completeness":{"profile":"ok","financials":"structured","debts":{"fs":"ok","sp":"ok","vszp":"ok","dovera":"unavailable","union":"not_supported"},"vat":"ok"},"index_freshness":{"updated_at":"2026-07-13T03:00:00.000Z","age_days":0,"stale":false},"profile":{"...": "..."},"financials":[{"...": "..."}],"financials_unavailable_reason":null,"pdf_attachments":[],"debts":{"...": "..."},"vat":{"...": "..."},"failed_sections":[],"sources":["RPO (CC-BY 4.0, ŠÚ SR)","RÚZ (MF SR)","FS OpenData","Sociálna poisťovňa","VšZP (Datahub)","Dôvera"],"disclaimer":"Informatívny výstup z verejných registrov, nie úverový rating ani právne posúdenie."}
 ```
 
 Ukážkové výstupy vyššie sú ilustračné, s anonymizovanými testovacími dátami
@@ -538,18 +568,20 @@ hodnoty (tržby, ID výkazov, dátum `as_of`) sa pri reálnom subjekte menia.
   v1.1.
 - **Firmy účtujúce podľa IFRS** — register poskytuje len PDF verzie
   závierok, štruktúrované metriky (tržby/VH/vlastné imanie) pre ne nie sú
-  dostupné; nástroj to vráti ako explicitný `unavailable_reason`, nikdy
-  ako tichú nulu.
+  dostupné; nástroj to vráti ako explicitný `unavailable_reason` (nikdy
+  ako tichú nulu), verdikt ⚪ a odkazy na PDF prílohy (rok, typ, veľkosť)
+  za posledné 2 roky — staršie cez parameter `years`.
 - **Živnostníci s jednoduchým účtovníctvom (JÚ)** — ich výkazy majú iné
   metriky (chýba vlastné imanie aj výsledok hospodárenia v porovnateľnej
   forme) a nie sú v MVP mapované; plánované na v1.1.
 - Žiadne ML skórovanie ani predikcie — iba deterministické pravidlá nad
   overiteľnými faktami z registrov.
 - **Union** — nemá verejný export dlžníkov, `skfirma_debts` ho vždy vráti ako
-  `unavailable`; plán na v1.1 je nejasný (závisí od dostupnosti dát).
-- **Dôvera** — nemá API, ide o krehký HTML scraping jednej stránky (S4);
-  akékoľvek zlyhanie (zmena HTML, výpadok, rate-limit) degraduje na
-  `unavailable`, nikdy nie na tichú nulu ani výnimku smerom k volajúcemu.
+  `not_supported`; plán je nejasný (závisí od dostupnosti dát).
+- **Dôvera** — nemá API, ide o krehký HTML scraping jednej stránky (S4).
+  Výpadok, rate-limit alebo Cloudflare challenge = `unavailable` s
+  `retryable: true`; zmena HTML = `parse_error` (do logu ide úryvok HTML).
+  Nikdy tichá nula ani výnimka smerom k volajúcemu.
 - **FS zoznam daňových dlžníkov nemá IČO** — párovanie na subjekt beží podľa
   normalizovaného názvu + adresy (`match_confidence: exact` = zhoda PSČ,
   `high` = zhoda len obce); pri nejednoznačnej zhode vráti `unverifiable`,
@@ -562,8 +594,8 @@ hodnoty (tržby, ID výkazov, dátum `as_of`) sa pri reálnom subjekte menia.
   pozri `as_of` pri každom zázname.
 - Lokálny index (`skfirma_debts`, `skfirma_vat_status`, sekcie „Dlhy"/„DPH"
   v `skfirma_check`) vyžaduje `pnpm ingest` — bez neho tieto nástroje
-  vrátia akčnú ⚠ hlášku (nie tichú nulu) a `skfirma_check` verdikt v takom
-  prípade nikdy nepresiahne 🟠 na základe chýbajúcich dát z indexu.
+  vrátia akčnú ⚠ hlášku (nie tichú nulu) a `skfirma_check` bez iného
+  signálu vráti ⚪ (nedá sa posúdiť), nikdy 🟢.
 
 ## Zdroje dát, licencie, čerstvosť
 
@@ -599,7 +631,7 @@ agreguje verejné dáta, nenahrádza due diligence.
 `pnpm smoke` (z koreňa repa, kde je `./data`) je živý akceptačný smoke cez stdio proti reálnym
 RPO/RÚZ/FS/SP/VšZP/Dôvera zdrojom (nie je súčasťou CI). Potrebuje lokálny
 (negitovaný) zoznam testovacích IČO v `docs/smoke-cases.json` — pole objektov
-`{ ico, name, expect, expect_debtor?, expect_vat_payer? }`, kde `expect` je
+`{ ico, name, expect, expect_debtor?, expect_vat_payer?, expect_pdf_attachments? }`, kde `expect` je
 zoznam verdiktových emoji, ktoré sa majú v odpovedi `skfirma_check` objaviť.
 Cestu je možné zmeniť premennou `SKFIRMA_SMOKE_CASES`. Bez súboru skript
 vypíše návod a skončí s kódom 2.

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildDatabase } from '../src/ingest/db-build.js';
 import { DatasetIndex } from '../src/clients/dataset-index.js';
+import { indexFreshness } from '../src/services.js';
 import type { MetaRow } from '../src/ingest/rows.js';
 
 let dir: string;
@@ -84,5 +85,34 @@ describe('DatasetIndex', () => {
       sp_debtors: { rows: [{ ico: '88888888', name: 'Firma Osem a. s.', address: null, city: 'Košice', amount_eur: 5 }], meta: meta('sp_debtors', '2026-07-13') },
     });
     expect(idx.spDebt('88888888')).toEqual({ amount_eur: 5, as_of: '2026-07-13' });
+  });
+});
+
+describe('čerstvosť indexu (P1-2)', () => {
+  const m = (dataset: MetaRow['dataset'], fetchedAt: string): MetaRow =>
+    ({ dataset, as_of: '2026-05-31', fetched_at: fetchedAt, source_url: 'https://example.test', record_count: 1, etag: 'e1' });
+  const sp = { ico: '77777777', name: 'Firma Sedem s. r. o.', address: null, city: 'Bratislava', amount_eur: 1 };
+
+  it('oldestFetchedAt = najstaršie overenie; 304 (verified) posunie fetched_at, zlyhaný dataset nie', () => {
+    const path = join(dir, 'index.sqlite');
+    buildDatabase(path, {
+      sp_debtors: { rows: [sp], meta: m('sp_debtors', '2026-07-01T03:00:00Z') },
+      tax_debtors: { rows: [{ name: 'Firma Sedem s. r. o.', amount_eur: 200, street: null, psc: null, obec: null }], meta: m('tax_debtors', '2026-07-01T03:00:00Z') },
+    });
+    // ďalší beh: tax_debtors 304 (overené), sp_debtors zlyhalo (carry-over bez overenia)
+    buildDatabase(path, {}, path, { datasets: ['tax_debtors'], fetchedAt: '2026-10-27T03:00:00Z' });
+    const idx = new DatasetIndex(path);
+    expect(idx.meta('tax_debtors')?.fetched_at).toBe('2026-10-27T03:00:00Z');
+    expect(idx.meta('sp_debtors')?.fetched_at).toBe('2026-07-01T03:00:00Z');
+    expect(idx.oldestFetchedAt()).toBe('2026-07-01T03:00:00Z');
+    idx.close();
+  });
+
+  it('indexFreshness: stale až nad prah (default 30 dní), počíta sa z fetched_at', () => {
+    const now = new Date('2026-10-27T12:00:00Z');
+    expect(indexFreshness('2026-10-20T03:00:00Z', now)).toEqual({ updated_at: '2026-10-20T03:00:00Z', age_days: 7, stale: false });
+    expect(indexFreshness('2026-09-27T03:00:00Z', now)).toMatchObject({ age_days: 30, stale: false });
+    expect(indexFreshness('2026-09-26T03:00:00Z', now)).toMatchObject({ age_days: 31, stale: true });
+    expect(indexFreshness(null, now)).toEqual({ updated_at: null, age_days: null, stale: false });
   });
 });

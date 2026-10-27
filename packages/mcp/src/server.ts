@@ -80,12 +80,12 @@ export function buildServer(deps: Deps): McpServer {
 
   server.registerTool('skfirma_financials', {
     title: 'Finančné metriky z účtovných závierok',
-    description: 'Tržby, VH, vlastné imanie, aktíva, zadlženosť a YoY z RÚZ za posledné roky. Nevracia surové výkazy. Príklad: ico="12345678", years=3.',
+    description: 'Tržby, VH, vlastné imanie, aktíva, zadlženosť a YoY z RÚZ za posledné roky. Nevracia surové výkazy. Pri firmách len s PDF závierkou (IFRS) vráti odkazy na PDF prílohy s rokom, typom a veľkosťou. Príklad: ico="12345678", years=3.',
     annotations: ANNOTATIONS,
     inputSchema: {
       ico: z.string().describe('8-miestne IČO'),
       years: z.number().int().min(1).max(10).default(3),
-      include_statement_ids: z.boolean().default(false).describe('Priloží id výkazov (pre detail/PDF)'),
+      include_statement_ids: z.boolean().default(false).describe('Priloží id účtovných výkazov v RÚZ'),
       response_format: responseFormat,
     },
   }, async ({ ico, years, include_statement_ids, response_format }) => run(async () => {
@@ -96,7 +96,7 @@ export function buildServer(deps: Deps): McpServer {
         : { ...fin, years: fin.years.map(({ statement_id: _omit, ...rest }) => rest) };
       return text(JSON.stringify(out));
     }
-    let md = renderFinancials(fin);
+    let md = renderFinancials(fin, { maxAttachmentYears: years });
     if (include_statement_ids && fin.years.length) {
       md += `\nStatement IDs: ${fin.years.map((y) => `${y.statement_id} (${y.period_label})`).join(', ')}`;
     }
@@ -130,7 +130,7 @@ export function buildServer(deps: Deps): McpServer {
 
   server.registerTool('skfirma_check', {
     title: 'Kompletná previerka firmy (verdikt + flagy)',
-    description: 'Jedno volanie: identita (RPO) + financie (RÚZ) + deterministický rizikový verdikt 🟢/🟠/🔴 s dôvodmi a zdrojmi. Zadaj ico ALEBO name (pri viacznačnom mene vráti kandidátov). Príklad: ico="12345678".',
+    description: 'Jedno volanie: identita (RPO) + financie (RÚZ) + dlhy + DPH a deterministický verdikt s dôvodmi a zdrojmi: 🟢 bez zistení, 🟠 zvýšené riziko, 🔴 vysoké riziko, ⚪ nedá sa posúdiť (žiadny rizikový signál, ale chýbajú kľúčové dáta, napr. financie len v PDF — to NIE JE riziko). Zadaj ico ALEBO name (pri viacznačnom mene vráti kandidátov). Príklad: ico="12345678".',
     annotations: ANNOTATIONS,
     inputSchema: {
       ico: z.string().optional().describe('8-miestne IČO'),

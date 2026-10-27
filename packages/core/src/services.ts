@@ -4,19 +4,20 @@
 import { CONFIG } from './config.js';
 import { BusyError, ToolError, validateIco } from './errors.js';
 import { mapEntityToProfile } from './domain/profile.js';
-import { evaluateRisk, type RiskResult } from './domain/risk.js';
+import { assessCompleteness, evaluateRisk, type RiskResult } from './domain/risk.js';
 import { fetchDebts } from './domain/debts.js';
 import { buildVatStatus } from './domain/vat.js';
 import type { RpoClient } from './clients/rpo.js';
 import type { RuzClient } from './clients/ruz.js';
 import type { DatasetIndex } from './clients/dataset-index.js';
 import type { DoveraClient } from './clients/dovera.js';
-import type { DebtsData, FinancialsResult, ProfileData, SearchCandidate, VatStatusData } from './types.js';
+import type { DebtsData, FinancialsResult, IndexFreshness, ProfileData, SearchCandidate, VatStatusData } from './types.js';
 
 export interface Deps {
   rpo: Pick<RpoClient, 'searchByIco' | 'searchByName' | 'getEntity'>;
   ruz: Pick<RuzClient, 'financials'>;
-  index: Pick<DatasetIndex, 'available' | 'vatStatus' | 'spDebt' | 'vszpDebt' | 'taxDebtorCandidates' | 'meta'>;
+  index: Pick<DatasetIndex, 'available' | 'vatStatus' | 'spDebt' | 'vszpDebt' | 'taxDebtorCandidates' | 'meta'>
+    & Partial<Pick<DatasetIndex, 'oldestFetchedAt'>>;
   dovera: Pick<DoveraClient, 'lookup'>;
   now?: () => Date;
 }
@@ -130,6 +131,14 @@ export interface CheckReport {
   debts: DebtsData | null;
   vat: VatStatusData | null;
   failed_sections: CheckSection[];
+  /** Čerstvosť lokálneho indexu (len ak previerka čítala dlhy/DPH z indexu). */
+  index_freshness: IndexFreshness | null;
+}
+
+export function indexFreshness(oldestFetchedAt: string | null, now: Date): IndexFreshness {
+  if (!oldestFetchedAt) return { updated_at: null, age_days: null, stale: false };
+  const age = Math.floor((now.getTime() - new Date(oldestFetchedAt).getTime()) / 86_400_000);
+  return { updated_at: oldestFetchedAt, age_days: age, stale: age > CONFIG.index.staleDays };
 }
 
 export interface CheckAmbiguous {
@@ -187,7 +196,7 @@ export async function checkCompany(
       ? (async (): Promise<ProfileData> => {
           const c = await deps.rpo.searchByIco(icoNorm);
           if (!c) throw new ToolError(`IČO ${icoNorm} som v RPO nenašiel. Over ho cez skfirma_search.`);
-          return mapEntityToProfile(await deps.rpo.getEntity(c.rpo_id, false));
+          return mapEntityToProfile(await deps.rpo.getEntity(c.rpo_id, false), now());
         })()
       : Promise.resolve(null),
     wantFin ? deps.ruz.financials(icoNorm, years) : Promise.resolve(null),
@@ -214,20 +223,21 @@ export async function checkCompany(
   const debts = debtsRes.status === 'fulfilled' ? debtsRes.value : null;
   const vat = vatRes.status === 'fulfilled' ? vatRes.value : null;
   const failed_sections: CheckSection[] = [];
-  const failed_sources: string[] = [];
-  if (wantProfile && profileRes.status === 'rejected') { failed_sections.push('profile'); failed_sources.push('RPO'); console.error('[skfirma_check] profile zlyhal:', profileRes.reason); }
-  if (wantFin && finRes.status === 'rejected') { failed_sections.push('financials'); failed_sources.push('RÚZ'); console.error('[skfirma_check] financials zlyhali:', finRes.reason); }
-  if (wantDebts && debtsRes.status === 'rejected') { failed_sections.push('debts'); failed_sources.push('dlhové zoznamy'); console.error('[skfirma_check] debts zlyhali:', debtsRes.reason); }
-  if (wantVat && vatRes.status === 'rejected') { failed_sections.push('vat'); failed_sources.push('FS DPH zoznamy'); console.error('[skfirma_check] vat zlyhal:', vatRes.reason); }
-  // Chýbajúci lokálny index nezhodí fetchDebts (kredítori sú 'unavailable'),
-  // ale nesmie prejsť ako 🟢 (zásada „chýbajúci zdroj ≠ zelená"). Zámerne bez
-  // dovera/union — Union je trvale unavailable a verdikt kapovať nesmie.
-  if (debts && (['fs', 'sp', 'vszp'] as const).every((k) => debts.creditors[k].status === 'unavailable')) {
-    failed_sources.push('dlhové zoznamy (lokálny index)');
-  }
+  if (wantProfile && profileRes.status === 'rejected') { failed_sections.push('profile'); console.error('[skfirma_check] profile zlyhal:', profileRes.reason); }
+  if (wantFin && finRes.status === 'rejected') { failed_sections.push('financials'); console.error('[skfirma_check] financials zlyhali:', finRes.reason); }
+  if (wantDebts && debtsRes.status === 'rejected') { failed_sections.push('debts'); console.error('[skfirma_check] debts zlyhali:', debtsRes.reason); }
+  if (wantVat && vatRes.status === 'rejected') { failed_sections.push('vat'); console.error('[skfirma_check] vat zlyhal:', vatRes.reason); }
 
-  const risk = evaluateRisk({ profile, financials, debts, vat, failed_sources, now: now() });
-  return { kind: 'report', ico: icoNorm, risk, profile, financials, debts, vat, failed_sections };
+  // Úplnosť dát je samostatná os: chýbajúci zdroj dá ⚪ (nedá sa posúdiť), nikdy horší verdikt.
+  const completeness = assessCompleteness({
+    requested: { profile: wantProfile, financials: wantFin, debts: wantDebts, vat: wantVat },
+    profile, financials, debts, vat,
+  });
+  const risk = evaluateRisk({ profile, financials, debts, vat, completeness, now: now() });
+  const index_freshness = (wantDebts || wantVat) && deps.index.available()
+    ? indexFreshness(deps.index.oldestFetchedAt?.() ?? null, now())
+    : null;
+  return { kind: 'report', ico: icoNorm, risk, profile, financials, debts, vat, failed_sections, index_freshness };
 }
 
 /** Stabilný JSON tvar previerky — rovnaký pre MCP (response_format=json) aj HTTP API. */
@@ -236,12 +246,15 @@ export function checkReportToJson(r: CheckReport) {
     ico: r.ico,
     verdict: r.risk.verdict,
     flags: r.risk.flags,
+    incomplete_reasons: r.risk.incomplete,
+    completeness: r.risk.completeness,
+    index_freshness: r.index_freshness,
     profile: r.profile,
     financials: r.financials?.years ?? [],
     financials_unavailable_reason: r.financials?.unavailable_reason ?? null,
+    pdf_attachments: r.financials?.pdf_attachments ?? [],
     debts: r.debts,
     vat: r.vat,
-    notes: r.risk.notes,
     failed_sections: r.failed_sections,
     sources: CHECK_SOURCES,
     disclaimer: CONFIG.disclaimer,

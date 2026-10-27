@@ -18,7 +18,7 @@ const fin: FinancialsResult = {
   years: [{ period_from: '2024-01', period_to: '2024-12', period_label: '2024', template: 'mikro UJ', statement_id: 1,
     revenue: 1_388_372, profit: 7_791, equity: 78_955, assets: 1_060_405, liabilities: 981_450,
     liabilities_ratio: 0.9255, revenue_yoy: 0.05, negative_equity: false }],
-  unavailable_reason: null, pdf_statement_ids: [], as_of: '2026-07-12',
+  unavailable_reason: null, pdf_attachments: [], as_of: '2026-07-12',
 };
 
 const deps = (over: Partial<Deps> = {}): Deps => ({

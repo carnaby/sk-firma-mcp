@@ -71,18 +71,35 @@ describe('RuzClient.financials', () => {
     });
   });
 
-  it('IFRS firma: prázdne tabuľky ⇒ ifrs_pdf_only + pdf_statement_ids', async () => {
+  it('IFRS firma: prázdne tabuľky ⇒ ifrs_pdf_only + PDF prílohy s rokom, typom a attachment URL', async () => {
     const pool = mockAgent.get(HOST);
     mockApi(pool, '/uctovne-jednotky', { 'zmenene-od': '2000-01-01', ico: '33333333' }, { id: [7] });
     mockApi(pool, '/uctovna-jednotka', { id: '7' }, { id: 7, ico: '33333333', nazovUJ: 'Firma Tri a. s.', idUctovnychZavierok: [11] });
-    mockApi(pool, '/uctovna-zavierka', { id: '11' }, { id: 11, obdobieOd: '2025-01', obdobieDo: '2025-12', typ: 'Riadna', idUctovnychVykazov: [21] });
-    mockApi(pool, '/uctovny-vykaz', { id: '21' }, { id: 21, idSablony: 709, pristupnostDat: 'Verejné prílohy', prilohy: [{ id: 1, meno: 'zavierka.pdf' }], obsah: { tabulky: [] } });
+    mockApi(pool, '/uctovna-zavierka', { id: '11' }, { id: 11, obdobieOd: '2025-01', obdobieDo: '2025-12', typ: 'Riadna', idUctovnychVykazov: [21, 22, 23, 24] });
+    mockApi(pool, '/uctovny-vykaz', { id: '21' }, { id: 21, idSablony: 709, prilohy: [{ id: 101, meno: 'zavierka.pdf', velkostPrilohy: 2_749_694 }], obsah: { tabulky: [] } });
+    mockApi(pool, '/uctovny-vykaz', { id: '22' }, { id: 22, idSablony: 742, prilohy: [{ id: 102, meno: 'scan_002.pdf', velkostPrilohy: 341_000 }], obsah: { tabulky: [] } });
+    // meno súboru klame („IFRS…"), rozhoduje šablóna
+    mockApi(pool, '/uctovny-vykaz', { id: '23' }, { id: 23, idSablony: 1166, prilohy: [{ id: 103, meno: 'IFRS_OS_2025.pdf', velkostPrilohy: 129_000 }], obsah: { tabulky: [] } });
+    mockApi(pool, '/uctovny-vykaz', { id: '24' }, { id: 24, idSablony: 9999, prilohy: [{ id: 104, meno: 'Vybrané údaje - podnikatelia.PDF' }], obsah: { tabulky: [] } });
+    mockApi(pool, '/sablona', { id: '709' }, { id: 709, nazov: 'IFRS účtovná závierka' });
+    mockApi(pool, '/sablona', { id: '742' }, { id: 742, nazov: 'Správa audítora' });
+    mockApi(pool, '/sablona', { id: '1166' }, { id: 1166, nazov: 'Oznámenie o dátume schválenia účtovnej závierky' });
+    pool.intercept({ path: '/cruz-public/api/sablona', method: 'GET', query: { id: '9999' } }).reply(404, 'not found');
 
     const r = await new RuzClient(new LruCache({ maxSize: 100 })).financials('33333333', 3);
     expect(r.years).toHaveLength(0);
     expect(r.unavailable_reason).toBe('ifrs_pdf_only');
-    expect(r.pdf_statement_ids).toEqual([21]);
-  });
+    expect(r.pdf_attachments.map((a) => [a.attachment_id, a.kind, a.year])).toEqual([
+      [101, 'financial_statements', '2025'],
+      [102, 'auditor_report', '2025'],
+      [104, 'selected_data', '2025'], // šablóna nedostupná → fallback na meno súboru
+      [103, 'approval_notice', '2025'], // formality na koniec
+    ]);
+    expect(r.pdf_attachments[0]).toMatchObject({
+      label: 'Účtovná závierka', size_bytes: 2_749_694, period_to: '2025-12',
+      url: 'https://www.registeruz.sk/cruz-public/domain/financialreport/attachment/101',
+    });
+  }, 15_000); // 11 dopytov cez throttle ~2 req/s
 
   it('neznáme IČO ⇒ not_found', async () => {
     const pool = mockAgent.get(HOST);
