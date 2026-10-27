@@ -1,0 +1,79 @@
+<!doctype html>
+<!--
+  Zdroj OG obrázka (public/og.png, 1200×630). Pregenerovanie:
+    pnpm --filter @skfirma/web og
+  (headless Chrome/Edge; cestu k prehliadaču možno zadať cez CHROME_PATH)
+-->
+<html lang="sk">
+<head>
+<meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=block" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #fff; --text: #15191f; --muted: #5b6573; --border: #dde1e7;
+    --accent: #0b5cad; --accent-dark: #083f78;
+    --green: #1a7f37; --green-bg: #e6f4ea; --orange: #b35900; --orange-bg: #fff1e0; --red: #c4231c; --red-bg: #fdeceb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    font-family: Inter, 'Segoe UI', system-ui, sans-serif; color: var(--text);
+    background:
+      radial-gradient(900px 500px at 105% -10%, rgb(11 92 173 / 0.14), transparent 60%),
+      radial-gradient(600px 400px at -10% 110%, rgb(11 92 173 / 0.08), transparent 60%),
+      var(--bg);
+    display: grid; grid-template-columns: 1fr 470px; gap: 56px; padding: 64px 72px;
+  }
+  .left { display: flex; flex-direction: column; }
+  .brand { display: flex; align-items: center; gap: 14px; font-weight: 700; font-size: 30px; letter-spacing: -0.01em; }
+  .mark { width: 52px; height: 52px; border-radius: 13px; background: var(--accent); display: grid; place-items: center; }
+  h1 { margin-top: 44px; font-size: 58px; line-height: 1.06; font-weight: 800; letter-spacing: -0.03em; }
+  h1 em { font-style: normal; color: var(--accent); }
+  .sub { margin-top: 24px; font-size: 24px; line-height: 1.4; color: var(--muted); max-width: 560px; }
+  .foot { margin-top: auto; display: flex; align-items: center; gap: 16px; }
+  .url { font-size: 24px; font-weight: 600; color: var(--accent-dark); }
+  .pill { font-size: 18px; font-weight: 600; color: var(--accent); background: rgb(11 92 173 / 0.09); border: 1px solid rgb(11 92 173 / 0.22); padding: 7px 14px; border-radius: 999px; }
+
+  .card {
+    align-self: center; background: var(--surface); border: 1px solid var(--border); border-radius: 22px;
+    box-shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 18px 48px rgb(16 24 40 / 0.12); padding: 28px;
+  }
+  .card-title { font-size: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 18px; }
+  .row { display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-radius: 14px; }
+  .row + .row { margin-top: 12px; }
+  .dot { width: 22px; height: 22px; border-radius: 50%; flex: none; }
+  .label { font-size: 23px; font-weight: 700; }
+  .detail { font-size: 17px; color: var(--muted); margin-top: 3px; }
+  .g { background: var(--green-bg); } .g .dot { background: var(--green); } .g .label { color: var(--green); }
+  .o { background: var(--orange-bg); } .o .dot { background: var(--orange); } .o .label { color: var(--orange); }
+  .r { background: var(--red-bg); } .r .dot { background: var(--red); } .r .label { color: var(--red); }
+  .sources { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); font-size: 16px; color: var(--muted); line-height: 1.5; }
+  .sources b { color: var(--text); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="brand">
+      <span class="mark">
+        <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 17l6 6 12-14" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      SK Firma
+    </div>
+    <h1>Prever slovenskú firmu <em>skôr, než jej pošleš peniaze</em></h1>
+    <p class="sub">Register, závierky, dlhy voči štátu a&nbsp;poisťovniam, DPH — s&nbsp;transparentným verdiktom.</p>
+    <div class="foot">
+      <span class="url">firma.carnaby.sk</span>
+      <span class="pill">MCP konektor pre Claude</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Verdikt z verejných registrov</div>
+    <div class="row g"><span class="dot"></span><div><div class="label">Bez zistení</div><div class="detail">aktívna, bez dlhov, platiteľ DPH</div></div></div>
+    <div class="row o"><span class="dot"></span><div><div class="label">Zvýšené riziko</div><div class="detail">tržby −42 % medziročne</div></div></div>
+    <div class="row r"><span class="dot"></span><div><div class="label">Vysoké riziko</div><div class="detail">dlžník Sociálnej poisťovne</div></div></div>
+    <div class="sources"><b>Zdroje:</b> RPO · RÚZ · Finančná&nbsp;správa · Sociálna&nbsp;poisťovňa · VšZP · Dôvera</div>
+  </div>
+</body>
+</html>
