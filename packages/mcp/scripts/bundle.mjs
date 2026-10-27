@@ -1,5 +1,5 @@
 // Publikovateľné biny: @skfirma/core (privátny workspace) sa inlinuje,
-// runtime závislosti z package.json ostávajú externé (better-sqlite3 je natívny).
+// runtime závislosti z package.json ostávajú externé (SQLite je vstavaný node:sqlite).
 import { build } from 'esbuild';
 import { readFileSync } from 'node:fs';
 
@@ -11,7 +11,7 @@ await build({
   bundle: true,
   platform: 'node',
   format: 'esm',
-  target: 'node20',
+  target: 'node24',
   external: Object.keys(pkg.dependencies).flatMap((d) => [d, `${d}/*`]),
   logLevel: 'warning',
 });

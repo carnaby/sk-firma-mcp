@@ -11,8 +11,11 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
-    "@skfirma/core": "*",
+    "@skfirma/core": "workspace:*",
     "hono": "^4.13.13",
-    "sk-firma-mcp-server": "*"
+    "sk-firma-mcp-server": "workspace:*"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
   }
 }

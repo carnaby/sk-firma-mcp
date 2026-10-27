@@ -12,7 +12,7 @@ export interface DebtsDeps {
   rpo: { searchByIco(ico: string): Promise<SearchCandidate | null> };
 }
 
-const INGEST_NOTE = 'Lokálny index neexistuje — spusti `npm run ingest`.';
+const INGEST_NOTE = 'Lokálny index neexistuje — spusti `pnpm ingest`.';
 const unavailable = (note: string): CreditorDebt => ({ status: 'unavailable', amount_eur: null, as_of: null, note });
 
 function fromDebtSum(result: { amount_eur: number; as_of: string } | null | undefined): CreditorDebt {

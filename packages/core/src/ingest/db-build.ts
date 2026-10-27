@@ -1,7 +1,7 @@
 // Stavba SQLite indexu: vždy nový súbor <out>.new + atomický swap.
 // Datasety, ktoré tento beh nepriniesol (zlyhaný download / 304), sa
 // prenesú z predchádzajúcej DB — posledný úspešný snapshot sa nikdy nemaže.
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import { existsSync, renameSync, rmSync } from 'node:fs';
 import { normalizeName, normalizeObec } from '../domain/name-match.js';
 import type {
@@ -37,6 +37,21 @@ export interface BuildInput {
   vszp_debtors?: FreshDataset<VszpDebtorRow>;
 }
 
+// node:sqlite (na rozdiel od better-sqlite3) chýbajúci pomenovaný parameter
+// ticho naviaže ako NULL. Chyba parsera by tak potichu vyrobila prázdne
+// stĺpce — preto kontrolujeme, že riadok nesie každý parameter (null je OK).
+type SqlValue = string | number | bigint | null | Uint8Array;
+const paramNames = (sql: string): string[] => [...sql.matchAll(/@(\w+)/g)].map((m) => m[1]!);
+function bindRow(row: Record<string, unknown>, params: string[], table: string): Record<string, SqlValue> {
+  const out: Record<string, SqlValue> = {};
+  for (const p of params) {
+    const v = row[p];
+    if (v === undefined) throw new Error(`Chýba hodnota '${p}' pre tabuľku ${table}.`);
+    out[p] = v as SqlValue;
+  }
+  return out;
+}
+
 const ALL_DATASETS: DatasetName[] = ['vat_payers', 'vat_erased', 'vat_risky', 'tax_debtors', 'sp_debtors', 'vszp_debtors'];
 
 const INSERTS: Record<DatasetName, string> = {
@@ -48,6 +63,9 @@ const INSERTS: Record<DatasetName, string> = {
   vszp_debtors: 'INSERT INTO vszp_debtors (ico, name, city, psc, amount_eur, payer_type, published_on) VALUES (@ico, @name, @city, @psc, @amount_eur, @payer_type, @published_on)',
 };
 
+const META_INSERT = 'INSERT INTO meta (dataset, as_of, fetched_at, source_url, record_count, etag) VALUES (@dataset, @as_of, @fetched_at, @source_url, @record_count, @etag)';
+const META_PARAMS = paramNames(META_INSERT);
+
 export function buildDatabase(
   outPath: string,
   fresh: BuildInput,
@@ -55,28 +73,34 @@ export function buildDatabase(
 ): { written: DatasetName[]; carried: DatasetName[] } {
   const newPath = `${outPath}.new`;
   if (existsSync(newPath)) rmSync(newPath);
-  const db = new Database(newPath);
+  const db = new DatabaseSync(newPath);
   const written: DatasetName[] = [];
   const carried: DatasetName[] = [];
   try {
     db.exec(SCHEMA);
-    const insertMeta = db.prepare('INSERT INTO meta (dataset, as_of, fetched_at, source_url, record_count, etag) VALUES (@dataset, @as_of, @fetched_at, @source_url, @record_count, @etag)');
+    const insertMeta = db.prepare(META_INSERT);
 
     for (const dataset of ALL_DATASETS) {
       const freshSet = fresh[dataset];
       if (freshSet) {
         const stmt = db.prepare(INSERTS[dataset]);
-        db.transaction(() => {
+        const params = paramNames(INSERTS[dataset]);
+        db.exec('BEGIN');
+        try {
           for (const row of freshSet.rows) {
             const r = dataset === 'tax_debtors'
               ? { ...row as Omit<TaxDebtorRow, 'name_norm' | 'obec_norm'>,
                   name_norm: normalizeName((row as { name: string }).name),
                   obec_norm: (row as { obec: string | null }).obec ? normalizeObec((row as { obec: string }).obec) : null }
               : row;
-            stmt.run(r);
+            stmt.run(bindRow(r as Record<string, unknown>, params, dataset));
           }
-          insertMeta.run({ ...freshSet.meta, record_count: freshSet.rows.length });
-        })();
+          insertMeta.run(bindRow({ ...freshSet.meta, record_count: freshSet.rows.length }, META_PARAMS, 'meta'));
+          db.exec('COMMIT');
+        } catch (e) {
+          db.exec('ROLLBACK');
+          throw e;
+        }
         written.push(dataset);
       }
     }

@@ -2,24 +2,25 @@
   "name": "sk-firma",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "packages/core",
-    "packages/mcp",
-    "apps/web",
-    "apps/server"
-  ],
-  "engines": { "node": ">=20" },
+  "packageManager": "pnpm@10.33.2",
+  "engines": { "node": ">=24" },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run build -w @skfirma/core -w sk-firma-mcp-server && npm run typecheck --workspaces --if-present",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm --filter @skfirma/core --filter sk-firma-mcp-server build && pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "npm run build -w @skfirma/core -w sk-firma-mcp-server && concurrently -n server,web \"npm run dev -w @skfirma/server\" \"npm run dev -w @skfirma/web\"",
+    "dev": "pnpm --filter @skfirma/core --filter sk-firma-mcp-server build && concurrently -n server,web \"pnpm --filter @skfirma/server dev\" \"pnpm --filter @skfirma/web dev\"",
     "start": "node apps/server/dist/main.js",
-    "ingest": "node packages/mcp/dist/bin/ingest.js"
+    "ingest": "node packages/mcp/dist/bin/ingest.js",
+    "smoke": "node packages/mcp/scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@skfirma/core": "workspace:*"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^26.1.1",
     "concurrently": "^9.2.1",
     "esbuild": "^0.28.1",

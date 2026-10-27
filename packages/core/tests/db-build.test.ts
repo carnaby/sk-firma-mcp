@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import { buildDatabase } from '../src/ingest/db-build.js';
 import type { MetaRow } from '../src/ingest/rows.js';
 
@@ -23,7 +23,7 @@ describe('buildDatabase', () => {
     expect(res.written.sort()).toEqual(['sp_debtors', 'tax_debtors']);
     expect(existsSync(out)).toBe(true);
     expect(existsSync(out + '.new')).toBe(false);
-    const db = new Database(out, { readonly: true });
+    const db = new DatabaseSync(out, { readOnly: true });
     expect(db.prepare('SELECT amount_eur FROM sp_debtors WHERE ico = ?').get('77777777')).toEqual({ amount_eur: 47.71 });
     expect(db.prepare('SELECT name_norm, obec_norm FROM tax_debtors').get()).toEqual({ name_norm: 'firma sedem s r o', obec_norm: 'bratislava' });
     expect(db.prepare("SELECT as_of FROM meta WHERE dataset = 'tax_debtors'").get()).toEqual({ as_of: '2026-05-31' });
@@ -42,10 +42,17 @@ describe('buildDatabase', () => {
     }, v1);
     expect(res.written).toEqual(['sp_debtors']);
     expect(res.carried).toEqual(['vszp_debtors']);
-    const db = new Database(v2, { readonly: true });
+    const db = new DatabaseSync(v2, { readOnly: true });
     expect(db.prepare('SELECT amount_eur FROM sp_debtors WHERE ico = ?').get('88888888')).toEqual({ amount_eur: 120 });
     expect(db.prepare('SELECT amount_eur FROM vszp_debtors WHERE ico = ?').get('88888888')).toEqual({ amount_eur: 55 });
     expect(db.prepare("SELECT as_of FROM meta WHERE dataset = 'vszp_debtors'").get()).toEqual({ as_of: '2026-07-01' });
     db.close();
+  });
+
+  it('riadok bez povinného stĺpca zhodí build (žiadne tiché NULL) a index nenahradí', () => {
+    const out = join(dir, 'bad.sqlite');
+    const row = { ico: '77777777', name: 'Firma Sedem s. r. o.', city: 'Bratislava', amount_eur: 1 } as never;
+    expect(() => buildDatabase(out, { sp_debtors: { rows: [row], meta: meta('sp_debtors') } })).toThrow(/address/);
+    expect(existsSync(out)).toBe(false);
   });
 });

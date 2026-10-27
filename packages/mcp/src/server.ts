@@ -105,7 +105,7 @@ export function buildServer(deps: Deps): McpServer {
 
   server.registerTool('skfirma_vat_status', {
     title: 'DPH status firmy',
-    description: 'Registrácia pre DPH z FS zoznamov: platiteľ/registrovaný (§4/§4b/§5 vs §7/§7a), vymazaný (§52/8), rizikový (§52/6). Vyžaduje lokálny index (npm run ingest). Príklad: ico="12345678".',
+    description: 'Registrácia pre DPH z FS zoznamov: platiteľ/registrovaný (§4/§4b/§5 vs §7/§7a), vymazaný (§52/8), rizikový (§52/6). Vyžaduje lokálny index (pnpm ingest). Príklad: ico="12345678".',
     annotations: ANNOTATIONS,
     inputSchema: {
       ico: z.string().optional().describe('8-miestne IČO'),

@@ -109,7 +109,7 @@ export function getVatStatus(deps: Deps, input: { ico?: string; icDph?: string }
     query = { icDph: norm };
   }
   const rows = deps.index.vatStatus(query);
-  if (!rows) throw new ToolError('Lokálny index neexistuje — spusti `npm run ingest` a skús znova.');
+  if (!rows) throw new ToolError('Lokálny index neexistuje — spusti `pnpm ingest` a skús znova.');
   return buildVatStatus(query, rows);
 }
 

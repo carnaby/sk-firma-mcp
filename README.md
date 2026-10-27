@@ -12,7 +12,11 @@ platiteľov DPH a transparentné pravidlá nad faktami. Výstup pre LLM je
 kompaktný markdown do ~1 500 tokenov, so zdrojmi a dátumom platnosti pri
 každom údaji.
 
-## Štruktúra (npm workspaces)
+## Štruktúra (pnpm workspace)
+
+Požiadavky: **Node 24+** (SQLite je vstavaný `node:sqlite`, žiadny natívny
+balík na kompiláciu) a **pnpm** (`corepack enable` — verzia je v
+`packageManager`).
 
 ```
 packages/core   @skfirma/core — klienti RPO/RÚZ/Dôvera, ingest, risk engine,
@@ -43,12 +47,12 @@ obaly nad ňou, takže verdikt na webe a v Claude je vždy rovnaký.
 ### Lokálne (stdio)
 
 ```bash
-npm ci && npm run build
+pnpm install && pnpm build
 claude mcp add skfirma -- node /cesta/k/repu/packages/mcp/dist/bin/cli.js
 ```
 
 Balík `sk-firma-mcp-server` zatiaľ nie je zverejnený na npm. Po
-`npm publish -w sk-firma-mcp-server` bude fungovať aj
+`pnpm --filter sk-firma-mcp-server publish` bude fungovať aj
 `claude mcp add skfirma -- npx -y sk-firma-mcp-server`. Biny v `dist/bin`
 sú zbundlované cez esbuild (privátny `@skfirma/core` je inlinovaný).
 
@@ -57,10 +61,10 @@ sú zbundlované cez esbuild (privátny `@skfirma/core` je inlinovaný).
 ### Lokálny vývoj
 
 ```bash
-npm ci
-npm run dev        # server na :8787 (bez ingestu) + Vite na :5173 s proxy na /api a /mcp
-npm test           # všetky testy, bez internetu (fixtures, MockAgent, fake deps)
-npm run typecheck
+pnpm install
+pnpm dev           # server na :8787 (bez ingestu) + Vite na :5173 s proxy na /api a /mcp
+pnpm test          # všetky testy, bez internetu (fixtures, MockAgent, fake deps)
+pnpm typecheck
 ```
 
 ### Produkcia (Docker, hocikde s perzistentným diskom)
@@ -174,7 +178,7 @@ vynuluje a pri viacerých inštanciách by ich bolo treba zdieľať (Redis).
 tieto registre live rozhranie nemajú. Index si postavíš príkazom:
 
 ```bash
-npm run build && npm run ingest   # z koreňa repa → ./data/skfirma-index.sqlite
+pnpm build && pnpm ingest   # z koreňa repa → ./data/skfirma-index.sqlite
 ```
 
 Stiahne a spracuje 6 verejných datasetov (~50–100 MB spolu):
@@ -195,7 +199,7 @@ ho pri zmene automaticky znovu otvorí bez reštartu).
 Premenné prostredia:
 
 - `SKFIRMA_INDEX_PATH` — cesta k SQLite indexu (default `./data/skfirma-index.sqlite`);
-  nastav rovnako pre `npm run ingest` aj pre bežiaci server.
+  nastav rovnako pre `pnpm ingest` aj pre bežiaci server.
 - `SKFIRMA_DOVERA` — `0` vypne live lookup na Dôveru v `skfirma_debts`/`skfirma_check`
   (napr. keď je zdroj dlhodobo nedostupný alebo blokovaný).
 
@@ -205,12 +209,12 @@ aktualizujú v rádoch dní až týždňov, denný cron je bezpečná horná hra
 Windows Task Scheduler (jeden riadok, denne o 3:00):
 
 ```powershell
-schtasks /create /tn "skfirma-ingest" /tr "cmd /c cd /d C:\cesta\k\repu && npm run ingest >> ingest.log 2>&1" /sc daily /st 03:00
+schtasks /create /tn "skfirma-ingest" /tr "cmd /c cd /d C:\cesta\k\repu && pnpm ingest >> ingest.log 2>&1" /sc daily /st 03:00
 ```
 
-**Známe obmedzenie na Windows:** `better-sqlite3` drží súbor indexu otvorený
-zamknutý, kým beží MCP server — pred spustením `npm run ingest` server
-(Claude Desktop/Code, alebo `npm run smoke`) najprv **zastav**, inak ingest
+**Známe obmedzenie na Windows:** SQLite drží súbor indexu otvorený
+zamknutý, kým beží MCP server — pred spustením `pnpm ingest` server
+(Claude Desktop/Code, alebo `pnpm smoke`) najprv **zastav**, inak ingest
 zlyhá na zápise (alebo ostane bežať proti starému súboru). Po dobehnutí
 ingestu server znovu spusti.
 
@@ -364,7 +368,7 @@ Statement IDs: 9000001 (2025), 9000002 (2024), 9000003 (2023)
 
 Finančná správa (daňoví dlžníci), Sociálna poisťovňa, VšZP a Dôvera per
 IČO; Union nemá verejný export, vždy vráti `unavailable`. Vyžaduje lokálny
-index (`npm run ingest`).
+index (`pnpm ingest`).
 
 _Príklady sú ilustračné s anonymizovanými údajmi._
 
@@ -546,7 +550,7 @@ hodnoty (tržby, ID výkazov, dátum `as_of`) sa pri reálnom subjekte menia.
   sa aktualizuje s oneskorením rádovo 2–7 týždňov oproti reálnemu stavu;
   pozri `as_of` pri každom zázname.
 - Lokálny index (`skfirma_debts`, `skfirma_vat_status`, sekcie „Dlhy"/„DPH"
-  v `skfirma_check`) vyžaduje `npm run ingest` — bez neho tieto nástroje
+  v `skfirma_check`) vyžaduje `pnpm ingest` — bez neho tieto nástroje
   vrátia akčnú ⚠ hlášku (nie tichú nulu) a `skfirma_check` verdikt v takom
   prípade nikdy nepresiahne 🟠 na základe chýbajúcich dát z indexu.
 
@@ -567,7 +571,7 @@ nebol strojovo spracovateľný.
 
 RPO a RÚZ sú live — server pri každom dopyte volá reálne API (s krátkodobým
 in-memory cache, aby sa neopakovali identické dopyty zbytočne). FS/SP/VšZP
-idú cez lokálny index postavený `npm run ingest` (pozri sekciu **Ingest**),
+idú cez lokálny index postavený `pnpm ingest` (pozri sekciu **Ingest**),
 Dôvera je live per-dopyt scraping. Každá odpoveď obsahuje `as_of` — dátum,
 ku ktorému je údaj platný — aby bolo vždy jasné, aká čerstvá je informácia,
 ktorú model dostal.
@@ -581,7 +585,7 @@ agreguje verejné dáta, nenahrádza due diligence.
 
 ## Vývoj
 
-`npm run smoke -w sk-firma-mcp-server` je živý akceptačný smoke cez stdio proti reálnym
+`pnpm smoke` (z koreňa repa, kde je `./data`) je živý akceptačný smoke cez stdio proti reálnym
 RPO/RÚZ/FS/SP/VšZP/Dôvera zdrojom (nie je súčasťou CI). Potrebuje lokálny
 (negitovaný) zoznam testovacích IČO v `docs/smoke-cases.json` — pole objektov
 `{ ico, name, expect, expect_debtor?, expect_vat_payer? }`, kde `expect` je

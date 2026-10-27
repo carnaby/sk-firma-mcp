@@ -69,7 +69,7 @@ describe('DatasetIndex', () => {
     expect(r.as_of).toBe('2026-05-31');
   });
 
-  // better-sqlite3 na Windowse otvára súbor bez FILE_SHARE_DELETE, takže
+  // SQLite na Windowse otvára súbor bez FILE_SHARE_DELETE, takže
   // atomický rename cez otvorený readonly handle (ktorý drží DatasetIndex)
   // zlyhá s EBUSY/EPERM — presne scenár, na ktorý upozorňuje chybová
   // hláška v buildDatabase (Task 7). Na POSIX funguje rename cez otvorený

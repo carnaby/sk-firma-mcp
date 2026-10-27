@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Živý akceptačný smoke: spustí server cez stdio a zavolá skfirma_check
 // na sade prípadov definovaných v lokálnom (gitignored) súbore s testovacími dátami.
+import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { readFileSync, existsSync } from 'node:fs';
@@ -25,7 +26,7 @@ Cestu k súboru môžeš zmeniť premennou prostredia SKFIRMA_SMOKE_CASES.`);
 
 const CASES = JSON.parse(readFileSync(CASES_PATH, 'utf8'));
 
-const transport = new StdioClientTransport({ command: 'node', args: [new URL('../dist/bin/cli.js', import.meta.url).pathname] });
+const transport = new StdioClientTransport({ command: 'node', args: [fileURLToPath(new URL('../dist/bin/cli.js', import.meta.url))] });
 const client = new Client({ name: 'smoke', version: '0.0.0' });
 await client.connect(transport);
 

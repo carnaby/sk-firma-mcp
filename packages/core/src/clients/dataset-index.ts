@@ -1,7 +1,7 @@
 // Read-only pohľad na lokálny SQLite index. Lazy open + reopen pri zmene
 // mtime (ingest atomicky swapuje súbor — server nepotrebuje reštart).
 // Chýbajúca DB nie je chyba: sekcie to prezentujú ako ⚠ + pokyn na ingest.
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import { statSync } from 'node:fs';
 import type { TaxDebtorCandidate } from '../domain/name-match.js';
 import type { DatasetName, MetaRow, VatErasedRow, VatPayerRow, VatRiskyRow } from '../ingest/rows.js';
@@ -14,12 +14,12 @@ export interface VatRows {
 }
 
 export class DatasetIndex {
-  private db: InstanceType<typeof Database> | null = null;
+  private db: DatabaseSync | null = null;
   private openedMtime = 0;
 
   constructor(private dbPath: string) {}
 
-  private open(): InstanceType<typeof Database> | null {
+  private open(): DatabaseSync | null {
     let mtime: number;
     try {
       mtime = statSync(this.dbPath).mtimeMs;
@@ -31,7 +31,8 @@ export class DatasetIndex {
     if (this.db && mtime === this.openedMtime) return this.db;
     this.db?.close();
     try {
-      this.db = new Database(this.dbPath, { readonly: true, fileMustExist: true });
+      // readOnly bez CREATE → chýbajúci súbor je chyba, nie prázdna DB
+      this.db = new DatabaseSync(this.dbPath, { readOnly: true });
       this.openedMtime = mtime;
       return this.db;
     } catch {
@@ -48,7 +49,7 @@ export class DatasetIndex {
   // spolieha sa na lazy reopen pri zmene mtime. Ingest CLI ho potrebuje: číta
   // predchádzajúce etagy z tej istej cesty, ktorú vzápätí buildDatabase
   // atomicky nahrádza (rename); na Windowse otvorený readonly handle bez
-  // FILE_SHARE_DELETE by rename zablokoval (EBUSY).
+  // FILE_SHARE_DELETE by rename zablokoval (EPERM/EBUSY).
   close(): void {
     this.db?.close();
     this.db = null;
@@ -91,7 +92,7 @@ export class DatasetIndex {
     if (!db) return undefined;
     const m = this.meta(table);
     if (!m) return undefined;
-    const row = db.prepare(`SELECT SUM(amount_eur) AS total FROM ${table} WHERE ico = ?`).get(ico) as { total: number | null };
+    const row = db.prepare(`SELECT SUM(amount_eur) AS total FROM ${table} WHERE ico = ?`).get(ico) as unknown as { total: number | null };
     if (row.total === null) return null;
     return { amount_eur: Math.round(row.total * 100) / 100, as_of: m.as_of };
   }
@@ -106,7 +107,7 @@ export class DatasetIndex {
     if (!m) return undefined;
     const candidates = db
       .prepare('SELECT name, psc, obec_norm, amount_eur FROM tax_debtors WHERE name_norm = ?')
-      .all(nameNorm) as TaxDebtorCandidate[];
+      .all(nameNorm) as unknown as TaxDebtorCandidate[];
     return { candidates, as_of: m.as_of };
   }
 }
