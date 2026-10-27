@@ -1,5 +1,5 @@
 # SK Firma na Synology NAS za DSM reverse proxy (bez Cloudflare Tunnel).
-# Postup: README → „Nasadenie na Synology (DSM reverse proxy)".
+# Postup: README.sk.md → „Nasadenie na Synology (DSM reverse proxy)".
 #
 # Tok: internet → router :443 → DSM reverse proxy (HTTPS, Let's Encrypt)
 #      → http://localhost:8080 → tento kontajner

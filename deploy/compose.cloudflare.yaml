@@ -1,7 +1,7 @@
 # SK Firma na NAS / domácom serveri — variant s Cloudflare Tunnel.
 #
 # Pred prvým spustením vlož do TUNNEL_TOKEN token z Cloudflare
-# (postup v README → „Nasadenie na NAS"). Bez tunela beží web len v LAN
+# (postup v README.sk.md → „Nasadenie na Synology (DSM reverse proxy)", variant Cloudflare Tunnel). Bez tunela beží web len v LAN
 # na http://<ip-nas>:8080 — vtedy blok `cloudflared` zmaž a TRUST_PROXY
 # nastav na "none".
 
