@@ -8,6 +8,11 @@ services:
   skfirma:
     image: ghcr.io/carnaby/sk-firma-mcp:latest
     container_name: skfirma
+    # infra-admin (services): healthcheck timing is owned by the infra admin; do not change it in this project.
+    # Policy: Tabula global decision "Healthcheck intervals on the home NAS" (#cb98). Requests go to the services project.
+    # Only the interval is set; the check itself comes from the image.
+    healthcheck:
+      interval: 30m
     restart: unless-stopped
     # Watchtower na NAS (repo services) sleduje len kontajnery s týmto labelom:
     # nový :latest po pushi do main nasadí do ~5 min, volume s indexom ostáva.
