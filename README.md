@@ -14,10 +14,13 @@ It runs as a website with a live check and as an **MCP server**, so Claude
 and other AI clients can call it as a tool ("Check company XY before I sign
 the contract").
 
-- **Official public sources only.** Live calls to the official APIs of the
-  Slovak business register (RPO) and the register of financial statements
-  (RÚZ), plus a local index built from published lists of debtors and VAT
-  payers. No scraping of the business register, no paid data.
+- **Public sources only.** Live calls to the official APIs of the Slovak
+  business register (RPO) and the register of financial statements (RÚZ),
+  plus a local index built from published lists of debtors and VAT payers
+  (Financial Administration and Social Insurance exports, VšZP via the
+  Slovensko.Digital open-data mirror). Dôvera has no export, so its public
+  debtor search page is queried live. No scraping of the business register,
+  no paid data.
 - **No ML scoring.** The verdict is a worst-of over transparent rules; every
   flag states its source and the date the data is valid for.
 - **Built for LLMs.** Compact markdown output (≈ 1,500 tokens max for a full

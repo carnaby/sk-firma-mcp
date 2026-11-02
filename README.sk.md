@@ -12,7 +12,9 @@ MCP konektor pre Claude a iné AI klientov.
 Žiadny scraping RPO/RÚZ, žiadne ML skórovanie — live dopyty na oficiálne API
 (Register právnických osôb ŠÚ SR, Register účtovných závierok MF SR) plus
 lokálny index z pravidelne aktualizovaných verejných zoznamov dlžníkov a
-platiteľov DPH a transparentné pravidlá nad faktami. Výstup pre LLM je
+platiteľov DPH (exporty Finančnej správy a Sociálnej poisťovne, VšZP cez
+otvorené dáta Slovensko.Digital; Dôvera nemá export, preto sa živo pýtame jej
+verejného vyhľadávania dlžníkov) a transparentné pravidlá nad faktami. Výstup pre LLM je
 kompaktný markdown do ~1 500 tokenov, so zdrojmi a dátumom platnosti pri
 každom údaji.
 

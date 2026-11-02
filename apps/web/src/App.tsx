@@ -81,6 +81,7 @@ export function App() {
           <nav>
             <a href="#pripojit">MCP konektor</a>
             <a href="#ako-to-funguje">Ako to funguje</a>
+            <a href="#sukromie">Ochrana údajov</a>
             <a href="https://github.com/carnaby/sk-firma-mcp" target="_blank" rel="noreferrer">GitHub</a>
           </nav>
         </div>
@@ -209,13 +210,50 @@ export function App() {
             </div>
           </div>
         </section>
+        <section id="sukromie" className="wrap section">
+          <h2>Ochrana údajov a kontakt</h2>
+          <div className="grid-2">
+            <div>
+              <h3>Čo zobrazujeme</h3>
+              <p>
+                Údaje z verejných registrov a zoznamov dlžníkov (RPO, RÚZ, Finančná správa, Sociálna poisťovňa, VšZP,
+                Dôvera) — vrátane mien štatutárov, spoločníkov a podnikateľov, ktorí sú fyzické osoby. Účelom je pomôcť
+                overiť si obchodného partnera; tieto údaje zverejňujú ich správcovia zo zákona.
+              </p>
+              <p className="muted small">
+                Bydliská štatutárov nezobrazujeme. Zo zoznamov Sociálnej poisťovne a VšZP preberáme len subjekty s IČO.
+              </p>
+              <h3>Čo neukladáme</h3>
+              <p>
+                Tvoje hľadania neukladáme. IP adresu držíme len v pamäti servera, najviac 24 hodín, kvôli limitom proti
+                zneužitiu. Návštevnosť meriame cez Umami bez cookies a bez textu hľadania.
+              </p>
+            </div>
+            <div>
+              <h3>Nesprávny údaj?</h3>
+              <p>
+                Ak je chyba priamo v registri alebo zozname dlžníkov, opraviť ju vie len jeho správca (ŠÚ SR, MF SR,
+                Finančná správa, poisťovňa). Ak sme údaj priradili nesprávne — napríklad dlh iného subjektu s rovnakým
+                menom — napíš nám, opravíme to.
+              </p>
+              <p>
+                Prevádzkovateľ: Jozef Sokol, <a href="mailto:dodusik@gmail.com">dodusik@gmail.com</a>. Na rovnakej adrese
+                uplatníš aj práva podľa GDPR (prístup, oprava, námietka). Sťažnosť môžeš podať na{' '}
+                <a href="https://dataprotection.gov.sk" target="_blank" rel="noreferrer">Úrad na ochranu osobných údajov SR</a>.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
 
       <footer className="footer">
         <div className="wrap">
           Informatívny výstup z verejných registrov, nie úverový rating ani právne posúdenie.
-          Dáta RPO © ŠÚ SR (CC-BY 4.0). Open source (MIT) na{' '}
-          <a href="https://github.com/carnaby/sk-firma-mcp" target="_blank" rel="noreferrer">GitHube</a>.
+          Dáta RPO © ŠÚ SR, licencia{' '}
+          <a href="https://creativecommons.org/licenses/by/4.0/deed.sk" target="_blank" rel="noreferrer">CC BY 4.0</a>{' '}
+          (upravené: výber a preformátovanie údajov). Open source (MIT) na{' '}
+          <a href="https://github.com/carnaby/sk-firma-mcp" target="_blank" rel="noreferrer">GitHube</a>
+          {' · '}<a href="#sukromie">Ochrana údajov a kontakt</a>.
         </div>
       </footer>
     </>
