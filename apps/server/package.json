@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev": "SKFIRMA_INGEST_INTERVAL_HOURS=0 SKFIRMA_INDEX_PATH=../../data/skfirma-index.sqlite tsx watch src/main.ts",
+    "dev": "cross-env SKFIRMA_INGEST_INTERVAL_HOURS=0 SKFIRMA_INDEX_PATH=../../data/skfirma-index.sqlite tsx watch src/main.ts",
     "start": "node dist/main.js"
   },
   "dependencies": {
@@ -16,6 +16,7 @@
     "sk-firma-mcp-server": "workspace:*"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "cross-env": "^7.0.3"
   }
 }
