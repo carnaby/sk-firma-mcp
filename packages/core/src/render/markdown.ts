@@ -171,7 +171,7 @@ export function renderCheck(input: {
   index_freshness?: IndexFreshness | null;
 }): string {
   const { profile, financials, debts, vat, risk, failed_sections } = input;
-  const name = profile?.name ?? financials?.name ?? 'Neznámy subjekt';
+  const name = profile?.name || financials?.name || 'Neznámy subjekt';
   const ico = input.ico ?? profile?.ico ?? financials?.ico ?? '?';
   const parts: string[] = [`## ${name} (IČO ${ico}) — verdikt: ${VERDICT_LABEL[risk.verdict]}`];
   if (risk.flags.length) {

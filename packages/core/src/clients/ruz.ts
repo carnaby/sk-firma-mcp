@@ -22,6 +22,12 @@ const Zavierka = z.object({
   idUctovnychVykazov: z.array(z.number()).default([]),
 }).passthrough();
 
+/** "2023-12" → "2024-01" */
+function monthAfter(ym: string): string {
+  const i = Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7));
+  return `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`;
+}
+
 function templateLabel(vykaz: RuzVykaz): string {
   const t = (vykaz.obsah?.titulnaStrana?.typUctovnejJednotky ?? '').toLowerCase();
   if (t.includes('mikro')) return 'mikro UJ';
@@ -80,40 +86,58 @@ export class RuzClient {
 
     // ID závierok rastú s časom podania — ideme od najnovších a skončíme, keď máme dosť období.
     // Stará firma má 20+ závierok; sťahovať všetky by míňalo denný rozpočet a spomaľovalo previerku.
-    const isCandidate = (zav: z.infer<typeof Zavierka>) =>
-      zav.konsolidovana !== true && (zav.typ === 'Riadna' || zav.typ === 'Mimoriadna');
-    const zavierky: z.infer<typeof Zavierka>[] = [];
-    const periods = new Set<string>();
+    type Zav = z.infer<typeof Zavierka>;
+    const isCandidate = (zav: Zav) =>
+      zav.konsolidovana !== true && (zav.typ === 'Riadna' || zav.typ === 'Mimoriadna') && !!zav.obdobieDo;
+    /** Najnovších `years` období (podľa obdobieDo), každé so závierkami od najnovšieho podania. */
+    const topPeriods = (all: Zav[]): Zav[][] => {
+      const byPeriod = new Map<string, Zav[]>();
+      for (const zav of all.filter(isCandidate)) {
+        const list = byPeriod.get(zav.obdobieDo!) ?? [];
+        list.push(zav);
+        byPeriod.set(zav.obdobieDo!, list);
+      }
+      return [...byPeriod.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, years).map(([, list]) => list);
+    };
+    // Dosť je, až keď najnovšie obdobia nadväzujú a najnovšie je čerstvé. Dodatočne podané staré roky
+    // majú vyššie ID ako posledná riadna závierka — skoršie zastavenie by verdikt počítalo zo starých rokov.
+    const minFreshYear = new Date().getFullYear() - CONFIG.risk.noRecentStatementsPeriods;
+    const enough = (all: Zav[]): boolean => {
+      const top = topPeriods(all);
+      if (top.length < years || Number(top[0][0].obdobieDo!.slice(0, 4)) < minFreshYear) return false;
+      return top.every((group, i) => i === 0 || monthAfter(group[0].obdobieDo!) === top[i - 1][0].obdobieOd);
+    };
+
+    // ID závierok rastú s časom podania — ideme od najnovších a skončíme, keď máme dosť období.
+    // Stará firma má 20+ závierok; sťahovať všetky by míňalo denný rozpočet a spomaľovalo previerku.
+    const zavierky: Zav[] = [];
     for (const zid of [...unit.idUctovnychZavierok].sort((a, b) => b - a)) {
-      const zav = Zavierka.parse(await this.api(`/uctovna-zavierka?id=${zid}`));
-      zavierky.push(zav);
-      if (isCandidate(zav)) periods.add(zav.obdobieDo ?? '');
-      if (periods.size >= years) break;
+      zavierky.push(Zavierka.parse(await this.api(`/uctovna-zavierka?id=${zid}`)));
+      if (enough(zavierky)) break;
     }
-    const kandidati = zavierky
-      .filter(isCandidate)
-      .sort((a, b) => (b.obdobieDo ?? '').localeCompare(a.obdobieDo ?? ''));
-    const vybrane: typeof kandidati = [];
-    for (const zav of kandidati) {
-      if (vybrane.length >= years) break;
-      if (vybrane.some((v) => v.obdobieDo === zav.obdobieDo)) continue;
-      vybrane.push(zav);
-    }
+    const vybrane = topPeriods(zavierky);
     if (vybrane.length === 0) return empty('no_statements', name);
 
     const yearInputs: YearInput[] = [];
     const attachments: StatementAttachment[] = [];
     let sawPdfOnly = false;
-    for (const zav of vybrane) {
+    for (const group of vybrane) {
+      // za to isté obdobie môže byť viac podaní — berieme prvé so štruktúrovaným výkazom
+      let zav = group[0];
       let structured: RuzVykaz | null = null;
-      const pdfVykazy: RuzVykaz[] = [];
-      for (const vid of zav.idUctovnychVykazov) {
-        const vykaz = (await this.api(`/uctovny-vykaz?id=${vid}`)) as RuzVykaz;
-        if (MAPPING[vykaz.idSablony] && (vykaz.obsah?.tabulky ?? []).some((t) => (t.data ?? []).length > 0)) {
-          structured = { ...vykaz, id: vykaz.id ?? vid };
-          break;
+      let pdfVykazy: RuzVykaz[] = [];
+      for (const candidate of group) {
+        const pdfs: RuzVykaz[] = [];
+        for (const vid of candidate.idUctovnychVykazov) {
+          const vykaz = (await this.api(`/uctovny-vykaz?id=${vid}`)) as RuzVykaz;
+          if (MAPPING[vykaz.idSablony] && (vykaz.obsah?.tabulky ?? []).some((t) => (t.data ?? []).length > 0)) {
+            structured = { ...vykaz, id: vykaz.id ?? vid };
+            break;
+          }
+          if ((vykaz.prilohy ?? []).length > 0) pdfs.push(vykaz);
         }
-        if ((vykaz.prilohy ?? []).length > 0) pdfVykazy.push(vykaz);
+        if (structured) { zav = candidate; break; }
+        if (pdfVykazy.length === 0 && pdfs.length > 0) { zav = candidate; pdfVykazy = pdfs; }
       }
       if (!structured) {
         if (pdfVykazy.length > 0) sawPdfOnly = true;

@@ -44,6 +44,7 @@ export async function fetchDebts(ico: string, deps: DebtsDeps): Promise<DebtsDat
       const match = matchTaxDebtor(tax.candidates, {
         psc: candidate.psc,
         municipality: candidate.municipality,
+        street: candidate.street,
         building_number: candidate.building_number,
         unique_name: candidate.register_code === '1',
       });

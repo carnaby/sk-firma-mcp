@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { EntityStatus, ProfileData } from '../types.js';
-import { current, formatRpoAddress } from './rpo-common.js';
+import { current, formatRpoAddress, latest } from './rpo-common.js';
 
 // Tolerantné schémy: tvar RPO sa líši per typ subjektu (S1 §Odporúčanie 5) —
 // všetko optional, neznáme polia prepúšťame.
@@ -72,11 +72,11 @@ export function mapEntityToProfile(entityRaw: unknown, now: Date = new Date()): 
   const e = RpoEntity.parse(entityRaw);
   const { status, status_text, status_since } = deriveStatus(e);
   return {
-    ico: current(e.identifiers)?.value ?? '',
-    name: current(e.fullNames)?.value ?? '',
-    legal_form: current(e.legalForms)?.value?.value ?? null,
-    legal_form_code: current(e.legalForms)?.value?.code ?? null,
-    address: formatRpoAddress(current(e.addresses)),
+    ico: latest(e.identifiers)?.value ?? '',
+    name: latest(e.fullNames)?.value ?? '',
+    legal_form: latest(e.legalForms)?.value?.value ?? null,
+    legal_form_code: latest(e.legalForms)?.value?.code ?? null,
+    address: formatRpoAddress(latest(e.addresses)),
     established_on: e.establishment ?? null,
     terminated_on: e.termination ?? null,
     status,

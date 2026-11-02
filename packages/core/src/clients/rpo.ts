@@ -3,7 +3,7 @@ import { CONFIG } from '../config.js';
 import { fetchJson } from '../http.js';
 import type { LruCache } from '../cache.js';
 import type { SearchCandidate } from '../types.js';
-import { current, formatRpoAddress } from '../domain/rpo-common.js';
+import { formatRpoAddress, latest } from '../domain/rpo-common.js';
 
 const Versioned = z.object({ value: z.string().optional(), validFrom: z.string().optional(), validTo: z.string().optional() }).passthrough();
 const SearchResult = z.object({
@@ -24,14 +24,15 @@ const SearchResult = z.object({
 const SearchResponse = z.object({ results: z.array(SearchResult).default([]) }).passthrough();
 
 function toCandidate(r: z.infer<typeof SearchResult>): SearchCandidate {
-  const a = current(r.addresses);
+  const a = latest(r.addresses);
   const address = formatRpoAddress(a);
   return {
-    ico: current(r.identifiers)?.value ?? null,
-    name: current(r.fullNames)?.value ?? '',
+    ico: latest(r.identifiers)?.value ?? null,
+    name: latest(r.fullNames)?.value ?? '',
     address,
     psc: a?.postalCodes?.[0] ?? null,
     municipality: a?.municipality?.value ?? null,
+    street: a?.street ?? null,
     building_number: a?.buildingNumber ?? null,
     register_code: r.sourceRegister?.value?.code ?? null,
     status: r.termination ? 'terminated' : 'active',

@@ -32,6 +32,24 @@ afterEach(async () => {
 });
 
 describe('RpoClient', () => {
+  it('zaniknutý subjekt bez aktuálneho mena a adresy → posledné platné, nie prázdne', async () => {
+    const zaniknuta = {
+      ...firma1SearchResult,
+      identifiers: [{ value: '11111111', validFrom: '2018-01-02', validTo: '2021-10-22' }],
+      fullNames: [
+        { value: 'Firma Jeden s. r. o.', validFrom: '2018-01-02', validTo: '2020-05-01' },
+        { value: 'Firma Jeden Nová s. r. o.', validFrom: '2020-05-02', validTo: '2021-10-22' },
+      ],
+      addresses: [{ ...firma1SearchResult.addresses[0], validTo: '2021-10-22' }],
+      termination: '2021-10-22',
+    };
+    mockAgent.get(HOST)
+      .intercept({ path: '/rpo/v1/search', query: { identifier: '11111111' } })
+      .reply(200, { results: [zaniknuta] });
+    const c = await new RpoClient(new LruCache({ maxSize: 100 })).searchByIco('11111111');
+    expect(c).toMatchObject({ ico: '11111111', name: 'Firma Jeden Nová s. r. o.', psc: '81101', status: 'terminated' });
+  });
+
   it('searchByIco vráti kandidáta s aktuálnym IČO', async () => {
     mockAgent.get(HOST)
       .intercept({ path: '/rpo/v1/search', query: { identifier: '11111111' } })
@@ -44,6 +62,7 @@ describe('RpoClient', () => {
       established_on: '2018-01-02',
       rpo_id: 1000001,
       address: 'Vzorová 123/4, 81101 Bratislava - mestská časť Staré Mesto',
+      street: 'Vzorová',
       building_number: '123/4',
       register_code: '1',
     });

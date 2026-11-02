@@ -81,7 +81,7 @@ export function CheckResult({ report, markdown }: { report: CheckReportJson; mar
   const [tab, setTab] = useState<'overview' | 'ai'>('overview');
   const v = VERDICT[report.verdict];
   const p = report.profile;
-  const name = p?.name ?? report.debts?.name ?? report.vat?.name ?? 'Neznámy subjekt';
+  const name = p?.name || report.debts?.name || report.vat?.name || 'Neznámy subjekt';
 
   return (
     <article className="card result">

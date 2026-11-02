@@ -41,6 +41,7 @@ export interface SearchCandidate {
   address: string | null;
   psc: string | null;          // PSČ aktuálnej adresy (pre FS match dlžníkov)
   municipality: string | null; // obec aktuálnej adresy
+  street?: string | null;          // ulica aktuálnej adresy bez čísla (FS match mimo OR)
   building_number?: string | null; // súpisné/orientačné číslo aktuálnej adresy (FS match mimo OR)
   register_code?: string | null;   // zdrojový register (CL010112): '1' = obchodný register, kde je meno jedinečné
   status: 'active' | 'terminated'; // search nevracia legalStatuses (S1) — len zánik

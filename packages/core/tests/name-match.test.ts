@@ -54,16 +54,26 @@ describe('matchTaxDebtor', () => {
   });
 
   describe('subjekt mimo obchodného registra (živnostník, združenie) — meno nie je jedinečné', () => {
-    const person = { ...company, unique_name: false };
-    it('zhoda PSČ + čísla domu → exact', () => {
+    const person = { ...company, street: 'Vzorová', unique_name: false };
+    it('zhoda PSČ, ulice aj čísla domu → exact', () => {
       expect(matchTaxDebtor([c()], person)).toEqual({ status: 'debtor', amount_eur: 780, confidence: 'exact' });
     });
-    it('číslo domu na konci ulice, rôzna interpunkcia', () => {
-      expect(matchTaxDebtor([c({ street: 'Nám. Sv. Trojice 12 / 3' })], person).status).toBe('debtor');
-      expect(matchTaxDebtor([c({ street: '12/3' })], person).status).toBe('debtor');
+    it('rôzna interpunkcia a diakritika nevadí', () => {
+      expect(matchTaxDebtor([c({ street: 'VZOROVA 12 / 3' })], person).status).toBe('debtor');
     });
-    it('rovnaké PSČ, iné číslo domu → unverifiable', () => {
+    it('obec bez ulíc: len číslo na oboch stranách → exact', () => {
+      expect(matchTaxDebtor([c({ street: '141' })], { ...person, street: null, building_number: '141' }).status).toBe('debtor');
+    });
+    it('rovnaké číslo na inej ulici → unverifiable', () => {
+      expect(matchTaxDebtor([c({ street: 'Iná ulica 12/3' })], person).status).toBe('unverifiable');
+    });
+    it('číslo sa musí zhodovať celé, nie len koncom', () => {
       expect(matchTaxDebtor([c({ street: 'Vzorová 112/3' })], person).status).toBe('unverifiable');
+      expect(matchTaxDebtor([c({ street: 'Vzorová 5/12/3' })], person).status).toBe('unverifiable');
+      expect(matchTaxDebtor([c({ street: 'Vzorová 1953/3' })], { ...person, building_number: '3' }).status).toBe('unverifiable');
+    });
+    it('ulica len na jednej strane → unverifiable', () => {
+      expect(matchTaxDebtor([c({ street: '12/3' })], person).status).toBe('unverifiable');
     });
     it('zhoda len obce (iná mestská časť) → unverifiable, nie dlžník', () => {
       const r = matchTaxDebtor([c({ psc: '85101' })], person);
