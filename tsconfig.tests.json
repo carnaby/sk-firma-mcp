@@ -1,0 +1,6 @@
+{
+  // Typová kontrola testov (vitest typy nekontroluje; balíkové tsconfigy berú len src/**).
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "noEmit": true, "declaration": false, "sourceMap": false },
+  "include": ["packages/*/tests/**/*.ts", "apps/server/tests/**/*.ts"]
+}

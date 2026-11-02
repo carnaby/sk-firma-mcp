@@ -113,7 +113,7 @@ describe('skfirma_check so 4 sekciami', () => {
   it('sections=[debts] + index nedostupný → ⚪ s ⚠, nikdy 🟢 (chýbajúci zdroj ≠ zelená)', async () => {
     const d = deps({
       index: { available: () => false, vatStatus: () => null, spDebt: () => undefined, vszpDebt: () => undefined, taxDebtorCandidates: () => undefined, meta: () => null },
-      dovera: { lookup: async () => ({ status: 'unavailable', note: 'test' }) },
+      dovera: { lookup: async () => ({ status: 'unavailable', retryable: false, note: 'test' }) },
     });
     const res = await callTool(d, 'skfirma_check', { ico: '11111111', sections: ['debts'] });
     const md = res.content[0].text;

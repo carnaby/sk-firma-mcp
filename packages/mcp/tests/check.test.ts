@@ -15,7 +15,7 @@ const unavailableIndex = {
   available: () => false, vatStatus: () => null, spDebt: () => undefined,
   vszpDebt: () => undefined, taxDebtorCandidates: () => undefined, meta: () => null,
 };
-const unavailableDovera = { lookup: async () => ({ status: 'unavailable' as const, note: 'test' }) };
+const unavailableDovera = { lookup: async () => ({ status: 'unavailable' as const, retryable: false, note: 'test' }) };
 
 const healthyFin: FinancialsResult = {
   ico: '11111111', name: 'Firma Jeden s. r. o.',

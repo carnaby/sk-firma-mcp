@@ -41,7 +41,7 @@ const vykaz687 = {
   },
 };
 
-function mockApi(pool: ReturnType<MockAgent['get']>, path: string, query: Record<string, string>, body: unknown) {
+function mockApi(pool: ReturnType<MockAgent['get']>, path: string, query: Record<string, string>, body: object) {
   pool.intercept({ path: `/cruz-public/api${path}`, query }).reply(200, body).persist();
 }
 

@@ -34,7 +34,7 @@ const deps = (over: Partial<Deps> = {}): Deps => ({
     available: () => false, vatStatus: () => null, spDebt: () => undefined,
     vszpDebt: () => undefined, taxDebtorCandidates: () => undefined, meta: () => null,
   },
-  dovera: { lookup: async () => ({ status: 'unavailable' as const, note: 'test' }) },
+  dovera: { lookup: async () => ({ status: 'unavailable' as const, retryable: false, note: 'test' }) },
   now: () => new Date('2026-07-12'),
   ...over,
 });

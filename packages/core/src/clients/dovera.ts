@@ -79,7 +79,7 @@ export class DoveraClient {
       try {
         await acquireUpstreamSlot(new URL(url).host);
         const res = await fetch(url, {
-          headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) sk-firma-mcp' },
+          headers: { 'user-agent': 'sk-firma-mcp-server/0.2 (+https://github.com/carnaby/sk-firma-mcp)' },
           signal: AbortSignal.timeout(CONFIG.dovera.timeoutMs),
         });
         html = await res.text();

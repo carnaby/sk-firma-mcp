@@ -59,8 +59,8 @@ describe('fetchDebts', () => {
       index: {
         available: () => true, spDebt: () => null, vszpDebt: () => null,
         taxDebtorCandidates: () => ({ candidates: [
-          { name: 'Firma Sedem s. r. o.', psc: '82101', obec_norm: 'bratislava', amount_eur: 780 },
-          { name: 'Firma Sedem s. r. o.', psc: '04001', obec_norm: 'kosice', amount_eur: 100 },
+          { name: 'Firma Sedem s. r. o.', psc: '82101', obec_norm: 'bratislava', street: null, amount_eur: 780 },
+          { name: 'Firma Sedem s. r. o.', psc: '04001', obec_norm: 'kosice', street: null, amount_eur: 100 },
         ], as_of: '2026-05-31' }),
       },
     }));

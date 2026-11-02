@@ -6,7 +6,7 @@
   "engines": { "node": ">=24" },
   "scripts": {
     "build": "pnpm -r build",
-    "typecheck": "pnpm --filter @skfirma/core --filter sk-firma-mcp-server build && pnpm -r typecheck",
+    "typecheck": "pnpm --filter @skfirma/core --filter sk-firma-mcp-server build && pnpm -r typecheck && tsc -p tsconfig.tests.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev": "pnpm --filter @skfirma/core --filter sk-firma-mcp-server build && concurrently -n server,web \"pnpm --filter @skfirma/server dev\" \"pnpm --filter @skfirma/web dev\"",
