@@ -4,6 +4,8 @@
 //   /*      — statický web (Vite build) so SPA fallbackom
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
+import { bodyLimit } from 'hono/body-limit';
+import { secureHeaders } from 'hono/secure-headers';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { readFileSync, existsSync } from 'node:fs';
@@ -33,9 +35,32 @@ export interface Limits {
   /** /mcp na IP — jedno použitie nástroja v Claude = 2–4 JSON-RPC volania */
   mcpPerMinute: number;
   mcpPerDay: number;
+  /** tools/call na IP — len tieto siahajú na štátne zdroje (initialize, tools/list sú lacné) */
+  mcpToolCallsPerMinute: number;
+  mcpToolCallsPerDay: number;
 }
 
-export const DEFAULT_LIMITS: Limits = { apiPerMinute: 20, apiPerDay: 300, mcpPerMinute: 60, mcpPerDay: 1500 };
+export const DEFAULT_LIMITS: Limits = {
+  apiPerMinute: 20, apiPerDay: 300, mcpPerMinute: 60, mcpPerDay: 1500, mcpToolCallsPerMinute: 20, mcpToolCallsPerDay: 300,
+};
+
+/** Telo /mcp požiadavky — volanie nástroja má pár stoviek bajtov. */
+const MCP_MAX_BODY_BYTES = 64 * 1024;
+
+/**
+ * Kľúč pre limity: IPv4 celá adresa, IPv6 prefix /64 — poskytovateľ prideľuje klientovi celú /64
+ * a rotáciou adries v nej by sa limit dal obísť.
+ */
+export function rateKey(ip: string): string {
+  if (!ip.includes(':')) return ip;
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
+  if (mapped) return mapped[1];
+  const [head, tail = ''] = ip.toLowerCase().split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail ? tail.split(':') : [];
+  const full = ip.includes('::') ? [...h, ...Array<string>(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
+  return `${full.slice(0, 4).map((x) => x.replace(/^0+(?=.)/, '')).join(':')}::/64`;
+}
 
 export interface AppOptions {
   deps: Deps;
@@ -43,6 +68,8 @@ export interface AppOptions {
   webDir?: string;
   trustProxy?: TrustProxy;
   limits?: Partial<Limits>;
+  /** Bearer token pre detailný /api/health (limity, spotreba upstream rozpočtu, IP). Bez neho len verejný stav. */
+  adminToken?: string;
 }
 
 export function createApp(opts: AppOptions): Hono {
@@ -53,6 +80,7 @@ export function createApp(opts: AppOptions): Hono {
   const DAY = 24 * 3600_000;
   const api = [new RateLimiter({ limit: L.apiPerMinute, windowMs: 60_000 }), new RateLimiter({ limit: L.apiPerDay, windowMs: DAY })];
   const mcpL = [new RateLimiter({ limit: L.mcpPerMinute, windowMs: 60_000 }), new RateLimiter({ limit: L.mcpPerDay, windowMs: DAY })];
+  const toolL = [new RateLimiter({ limit: L.mcpToolCallsPerMinute, windowMs: 60_000 }), new RateLimiter({ limit: L.mcpToolCallsPerDay, windowMs: DAY })];
 
   const clientIp = (c: Context): string => {
     if (trust === 'cloudflare') {
@@ -69,10 +97,11 @@ export function createApp(opts: AppOptions): Hono {
     }
   };
 
-  const limited = (limiters: RateLimiter[]) => async (c: Context, next: () => Promise<void>) => {
-    const ip = clientIp(c);
+  /** null = povolené, inak 429 odpoveď */
+  const checkLimits = (c: Context, limiters: RateLimiter[]): Response | null => {
+    const key = rateKey(clientIp(c));
     for (const limiter of limiters) {
-      const r = limiter.hit(ip);
+      const r = limiter.hit(key);
       if (!r.allowed) {
         const retry = Math.ceil(r.retryAfterMs / 1000);
         c.header('Retry-After', String(retry));
@@ -82,8 +111,31 @@ export function createApp(opts: AppOptions): Hono {
         return c.json({ error: msg }, 429);
       }
     }
+    return null;
+  };
+  const limited = (limiters: RateLimiter[]) => async (c: Context, next: () => Promise<void>) => {
+    const denied = checkLimits(c, limiters);
+    if (denied) return denied;
     await next();
   };
+
+  // ---------- hlavičky ----------
+
+  app.use('*', secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", 'https://analytics.carnaby.sk'],
+      connectSrc: ["'self'", 'https://analytics.carnaby.sk'],
+      imgSrc: ["'self'", 'data:'],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    strictTransportSecurity: false, // HSTS nastavuje TLS proxy pred nami
+  }));
 
   // ---------- API ----------
 
@@ -96,7 +148,10 @@ export function createApp(opts: AppOptions): Hono {
       const m = deps.index.meta(d);
       return { dataset: d, as_of: m?.as_of ?? null, records: m?.record_count ?? null };
     });
-    return c.json({ ok: true, version: SERVER_INFO.version, index_available: deps.index.available(), index, upstream: upstreamStats(), limits: L, client_ip: clientIp(c) });
+    const pub = { ok: true, version: SERVER_INFO.version, index_available: deps.index.available(), index };
+    // limity a spotrebu rozpočtu nevidí každý — útočník by z nich čítal, ako blízko je k vyčerpaniu
+    const admin = !!opts.adminToken && c.req.header('authorization') === `Bearer ${opts.adminToken}`;
+    return c.json(admin ? { ...pub, upstream: upstreamStats(), limits: L, client_ip: clientIp(c) } : pub);
   });
 
   app.get('/api/check', async (c) => {
@@ -130,7 +185,25 @@ export function createApp(opts: AppOptions): Hono {
     exposeHeaders: ['Mcp-Session-Id', 'Mcp-Protocol-Version'],
   }));
   app.use('/mcp', limited(mcpL));
-  app.all('/mcp', (c) => mcp(c.req.raw));
+  app.use('/mcp', bodyLimit({
+    maxSize: MCP_MAX_BODY_BYTES,
+    onError: (c) => c.json({ jsonrpc: '2.0', error: { code: -32600, message: 'Request too large.' }, id: null }, 413),
+  }));
+  app.all('/mcp', async (c) => {
+    if (c.req.method !== 'POST') return mcp(c.req.raw);
+    const text = await c.req.text();
+    let msg: unknown;
+    try { msg = JSON.parse(text); } catch { msg = null; }
+    // batch by v jednom HTTP requeste (= 1 hit limitu) niesol desiatky volaní nástrojov; MCP 2025-06-18 ho aj tak nepodporuje
+    if (Array.isArray(msg)) {
+      return c.json({ jsonrpc: '2.0', error: { code: -32600, message: 'JSON-RPC batch is not supported, send one message per request.' }, id: null }, 400);
+    }
+    if ((msg as { method?: unknown } | null)?.method === 'tools/call') {
+      const denied = checkLimits(c, toolL);
+      if (denied) return denied;
+    }
+    return mcp(new Request(c.req.raw.url, { method: 'POST', headers: c.req.raw.headers, body: text }));
+  });
 
   // ---------- errors ----------
 

@@ -158,15 +158,16 @@ posielať dopyty na RPO, RÚZ a Dôveru. Ochrana má dve úrovne:
 
 | Vrstva | Chráni pred | Default |
 |---|---|---|
-| Limit na IP — minúta | jedným klientom, ktorý klikne 100× | API 20/min, MCP 60/min |
-| Limit na IP — deň | crawlerom z jednej adresy | API 300/deň, MCP 1 500/deň |
+| Limit na IP — minúta | jedným klientom, ktorý klikne 100× | API 20/min, MCP 60/min, nástroje 20/min |
+| Limit na IP — deň | crawlerom z jednej adresy | API 300/deň, MCP 1 500/deň, nástroje 300/deň |
+| Kľúč limitu, telo | obchádzaniu limitu | IPv6 sa ráta po sieti /64; JSON-RPC batch sa odmieta; telo `/mcp` max. 64 kB |
 | Cache + single-flight | opakovaným a súbežným dopytom na tú istú firmu | RPO 7 dní, RÚZ a Dôvera 1 deň |
 | Throttle na host | nárazom | ~2 req/s na RPO, RÚZ, Dôveru |
 | Max. fronta na host | zahlteniu (veľa IP naraz) | 20 čakajúcich, ďalší dostane hneď „vyťažené" (HTTP 503) |
 | Denný rozpočet na host | súčtu všetkých klientov | 20 000 dopytov/deň na zdroj |
 
 Aktuálne čísla (spotreba rozpočtu, fronta, odmietnuté) ukazuje
-`/api/health` → `upstream`. Limity sú v pamäti procesu: reštart ich
+`/api/health` → `upstream`, len s hlavičkou `Authorization: Bearer $SKFIRMA_ADMIN_TOKEN`. Limity sú v pamäti procesu: reštart ich
 vynuluje a pri viacerých inštanciách by ich bolo treba zdieľať (Redis).
 
 | Premenná | Default | |
@@ -177,6 +178,8 @@ vynuluje a pri viacerých inštanciách by ich bolo treba zdieľať (Redis).
 | `TRUST_PROXY` | `none` | `cloudflare` = IP z `CF-Connecting-IP`; `xff` = posledná položka `X-Forwarded-For` (vlastná reverse proxy) |
 | `RATE_LIMIT_API_PER_MINUTE` / `_PER_DAY` | `20` / `300` | na IP pre `/api/check` a `/api/search` |
 | `RATE_LIMIT_MCP_PER_MINUTE` / `_PER_DAY` | `60` / `1500` | na IP pre `/mcp` (jedno použitie nástroja = 2–4 volania) |
+| `RATE_LIMIT_TOOLS_PER_MINUTE` / `_PER_DAY` | `20` / `300` | na IP pre volania nástrojov (`tools/call`) cez `/mcp`; JSON-RPC batch sa odmieta |
+| `SKFIRMA_ADMIN_TOKEN` | — | `Authorization: Bearer <token>` na `/api/health` vráti aj limity a spotrebu rozpočtu; bez neho len verejný stav |
 | `SKFIRMA_UPSTREAM_MAX_QUEUE` | `20` | max. čakajúcich dopytov na jeden zdroj |
 | `SKFIRMA_UPSTREAM_DAILY_BUDGET` | `20000` | max. dopytov na jeden zdroj za deň (UTC) |
 | `WEB_DIR` | `apps/web/dist` | build webu |

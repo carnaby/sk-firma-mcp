@@ -31,7 +31,10 @@ const app = createApp({
     apiPerDay: num(env.RATE_LIMIT_API_PER_DAY, DEFAULT_LIMITS.apiPerDay),
     mcpPerMinute: num(env.RATE_LIMIT_MCP_PER_MINUTE, DEFAULT_LIMITS.mcpPerMinute),
     mcpPerDay: num(env.RATE_LIMIT_MCP_PER_DAY, DEFAULT_LIMITS.mcpPerDay),
+    mcpToolCallsPerMinute: num(env.RATE_LIMIT_TOOLS_PER_MINUTE, DEFAULT_LIMITS.mcpToolCallsPerMinute),
+    mcpToolCallsPerDay: num(env.RATE_LIMIT_TOOLS_PER_DAY, DEFAULT_LIMITS.mcpToolCallsPerDay),
   },
+  adminToken: env.SKFIRMA_ADMIN_TOKEN || undefined,
 });
 
 const stopIngest = ingestHours > 0 ? scheduleIngest({ indexPath, intervalHours: ingestHours }) : () => {};

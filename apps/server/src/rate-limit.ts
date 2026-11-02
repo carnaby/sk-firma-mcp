@@ -5,13 +5,18 @@ export class RateLimiter {
   private hits = new Map<string, { count: number; resetAt: number }>();
   private lastSweep = 0;
 
-  constructor(private opts: { limit: number; windowMs: number; now?: () => number }) {}
+  constructor(private opts: { limit: number; windowMs: number; now?: () => number; maxKeys?: number }) {}
+
+  get size(): number {
+    return this.hits.size;
+  }
 
   hit(key: string): { allowed: boolean; retryAfterMs: number } {
     const now = this.opts.now?.() ?? Date.now();
     this.sweep(now);
     let e = this.hits.get(key);
     if (!e || e.resetAt <= now) {
+      this.evictIfFull(now);
       e = { count: 0, resetAt: now + this.opts.windowMs };
       this.hits.set(key, e);
     }
@@ -19,6 +24,17 @@ export class RateLimiter {
     return e.count <= this.opts.limit
       ? { allowed: true, retryAfterMs: 0 }
       : { allowed: false, retryAfterMs: e.resetAt - now };
+  }
+
+  /** Strop pamäte: pri zaplnení najprv zmaž expirované, potom najstaršie kľúče (Map drží poradie vloženia). */
+  private evictIfFull(now: number): void {
+    const max = this.opts.maxKeys ?? 50_000;
+    if (this.hits.size < max) return;
+    for (const [k, e] of this.hits) if (e.resetAt <= now) this.hits.delete(k);
+    for (const k of this.hits.keys()) {
+      if (this.hits.size < max) break;
+      this.hits.delete(k);
+    }
   }
 
   private sweep(now: number): void {

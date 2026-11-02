@@ -117,11 +117,40 @@ describe('HTTP API', () => {
     expect(res.headers.get('retry-after')).toBe('30');
   });
 
-  it('health ukazuje stav limitov a odchádzajúcich dopytov', async () => {
-    const body = (await (await get(createApp({ deps: deps() }), '/api/health')).json()) as Record<string, unknown>;
-    expect(body).toHaveProperty('upstream');
-    expect(body).toHaveProperty('limits');
-    expect(body).toHaveProperty('client_ip');
+  it('verejný health neprezrádza limity, spotrebu ani IP; s admin tokenom áno', async () => {
+    const app = createApp({ deps: deps(), adminToken: 'tajne' });
+    const pub = (await (await get(app, '/api/health')).json()) as Record<string, unknown>;
+    expect(pub).toHaveProperty('ok', true);
+    expect(pub).toHaveProperty('index');
+    expect(pub).not.toHaveProperty('upstream');
+    expect(pub).not.toHaveProperty('limits');
+    expect(pub).not.toHaveProperty('client_ip');
+    const bad = (await (await app.request('/api/health', { headers: { authorization: 'Bearer zle' } })).json()) as Record<string, unknown>;
+    expect(bad).not.toHaveProperty('upstream');
+    const admin = (await (await app.request('/api/health', { headers: { authorization: 'Bearer tajne' } })).json()) as Record<string, unknown>;
+    expect(admin).toHaveProperty('upstream');
+    expect(admin).toHaveProperty('limits');
+    expect(admin).toHaveProperty('client_ip');
+  });
+
+  it('bez admin tokenu v konfigurácii health detaily nikdy nevráti', async () => {
+    const res = await createApp({ deps: deps() }).request('/api/health', { headers: { authorization: 'Bearer ' } });
+    expect((await res.json()) as Record<string, unknown>).not.toHaveProperty('upstream');
+  });
+
+  it('IPv6: limit platí pre celú /64 sieť (rotácia adries v rámci prefixu ho neobíde)', async () => {
+    const app = createApp({ deps: deps(), trustProxy: 'cloudflare', limits: { apiPerMinute: 1 } });
+    const req = (ip: string) => app.request('/api/check?q=11111111', { headers: { 'cf-connecting-ip': ip } });
+    expect((await req('2001:db8:1:2::1')).status).toBe(200);
+    expect((await req('2001:db8:1:2:ffff::5')).status).toBe(429);
+    expect((await req('2001:DB8:1:3::1')).status).toBe(200);
+  });
+
+  it('bezpečnostné hlavičky', async () => {
+    const res = await get(createApp({ deps: deps() }), '/api/health');
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('referrer-policy')).toBeTruthy();
+    expect(res.headers.get('content-security-policy')).toMatch(/frame-ancestors 'none'/);
   });
 });
 
@@ -138,6 +167,32 @@ describe('remote MCP (/mcp)', () => {
     const res = (await client.callTool({ name: 'skfirma_check', arguments: { ico: '11111111' } })) as { content: { text: string }[] };
     expect(res.content[0].text).toContain('Firma Jeden');
     await client.close();
+  });
+
+  const rpc = (app: ReturnType<typeof createApp>, body: unknown) => app.request('/mcp', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+  const toolCall = (id: number) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'skfirma_check', arguments: { ico: '11111111' } } });
+
+  it('JSON-RPC batch (pole) → 400, jeden HTTP request nesmie niesť viac volaní', async () => {
+    const res = await rpc(createApp({ deps: deps() }), [toolCall(1), toolCall(2)]);
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { message: string } }).error.message).toMatch(/batch/i);
+  });
+
+  it('volania nástrojov majú vlastný denný limit na IP', async () => {
+    const app = createApp({ deps: deps(), limits: { mcpToolCallsPerDay: 1 } });
+    expect((await rpc(app, toolCall(1))).status).toBe(200);
+    expect((await rpc(app, { jsonrpc: '2.0', id: 2, method: 'tools/list' })).status).toBe(200); // lacné volania sa nerátajú
+    const res = await rpc(app, toolCall(3));
+    expect(res.status).toBe(429);
+  });
+
+  it('príliš veľké telo /mcp → 413', async () => {
+    const res = await rpc(createApp({ deps: deps() }), JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', pad: 'x'.repeat(100_000) }));
+    expect(res.status).toBe(413);
   });
 
   it('GET /mcp → 405 (bezstavový server)', async () => {
@@ -170,5 +225,10 @@ describe('RateLimiter', () => {
     expect(rl.hit('b').allowed).toBe(true);
     t = 1001;
     expect(rl.hit('a').allowed).toBe(true);
+  });
+  it('počet sledovaných kľúčov je zhora obmedzený (pamäť nerastie donekonečna)', () => {
+    const rl = new RateLimiter({ limit: 5, windowMs: 24 * 3600_000, maxKeys: 100, now: () => 0 });
+    for (let i = 0; i < 1000; i++) rl.hit(`ip${i}`);
+    expect(rl.size).toBeLessThanOrEqual(100);
   });
 });

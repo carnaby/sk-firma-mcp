@@ -49,7 +49,7 @@ export function buildServer(deps: Deps): McpServer {
     description: 'Nájde subjekt podľa názvu (fulltext) alebo 8-miestneho IČO v RPO. Použi na disambiguáciu pred skfirma_profile/skfirma_check. Príklad: query="Firma Jeden" alebo query="12345678".',
     annotations: ANNOTATIONS,
     inputSchema: {
-      query: z.string().describe('Názov firmy alebo 8-miestne IČO'),
+      query: z.string().max(200).describe('Názov firmy alebo 8-miestne IČO'),
       only_active: z.boolean().default(true).describe('Vynechať zaniknuté subjekty'),
       limit: z.number().int().min(1).max(CONFIG.search.maxLimit).default(CONFIG.search.defaultLimit),
       offset: z.number().int().min(0).default(0),
@@ -68,7 +68,7 @@ export function buildServer(deps: Deps): McpServer {
     description: 'Identita subjektu z RPO: názov, právna forma, adresa, právny stav (likvidácia/konkurz), štatutári, spoločníci, SK NACE. Príklad: ico="12345678".',
     annotations: ANNOTATIONS,
     inputSchema: {
-      ico: z.string().describe('8-miestne IČO'),
+      ico: z.string().max(20).describe('8-miestne IČO'),
       include_history: z.boolean().default(false).describe('Pri JSON formáte priloží kompletnú históriu záznamu'),
       response_format: responseFormat,
     },
@@ -83,7 +83,7 @@ export function buildServer(deps: Deps): McpServer {
     description: 'Tržby, VH, vlastné imanie, aktíva, zadlženosť a YoY z RÚZ za posledné roky. Nevracia surové výkazy. Pri firmách len s PDF závierkou (IFRS) vráti odkazy na PDF prílohy s rokom, typom a veľkosťou. Príklad: ico="12345678", years=3.',
     annotations: ANNOTATIONS,
     inputSchema: {
-      ico: z.string().describe('8-miestne IČO'),
+      ico: z.string().max(20).describe('8-miestne IČO'),
       years: z.number().int().min(1).max(10).default(3),
       include_statement_ids: z.boolean().default(false).describe('Priloží id účtovných výkazov v RÚZ'),
       response_format: responseFormat,
@@ -108,8 +108,8 @@ export function buildServer(deps: Deps): McpServer {
     description: 'Registrácia pre DPH z FS zoznamov: platiteľ/registrovaný (§4/§4b/§5 vs §7/§7a), rizikový (§52/6) a minulý výskyt v zozname rizikových (vymazaní platitelia). Vyžaduje lokálny index (pnpm ingest). Príklad: ico="12345678".',
     annotations: ANNOTATIONS,
     inputSchema: {
-      ico: z.string().optional().describe('8-miestne IČO'),
-      ic_dph: z.string().optional().describe('IČ DPH v tvare SK + 10 číslic'),
+      ico: z.string().max(20).optional().describe('8-miestne IČO'),
+      ic_dph: z.string().max(20).optional().describe('IČ DPH v tvare SK + 10 číslic'),
       response_format: responseFormat,
     },
   }, async ({ ico, ic_dph, response_format }) => run(async () => {
@@ -121,7 +121,7 @@ export function buildServer(deps: Deps): McpServer {
     title: 'Dlhy voči štátu a poisťovniam',
     description: 'FS (daňoví dlžníci), Sociálna poisťovňa, VšZP, Dôvera per IČO; Union nedostupný. FS bez IČO — párované podľa názvu s match_confidence. Vyžaduje lokálny index. Príklad: ico="12345678".',
     annotations: ANNOTATIONS,
-    inputSchema: { ico: z.string().describe('8-miestne IČO'), response_format: responseFormat },
+    inputSchema: { ico: z.string().max(20).describe('8-miestne IČO'), response_format: responseFormat },
   }, async ({ ico, response_format }) => run(async () => {
     const d = await getDebts(deps, { ico });
     if (response_format === 'json') return text(JSON.stringify(d));
@@ -133,8 +133,8 @@ export function buildServer(deps: Deps): McpServer {
     description: 'Jedno volanie: identita (RPO) + financie (RÚZ) + dlhy + DPH a deterministický verdikt s dôvodmi a zdrojmi: 🟢 bez zistení, 🟠 zvýšené riziko, 🔴 vysoké riziko, ⚪ nedá sa posúdiť (žiadny rizikový signál, ale chýbajú kľúčové dáta, napr. financie len v PDF — to NIE JE riziko). Zadaj ico ALEBO name (pri viacznačnom mene vráti kandidátov). Príklad: ico="12345678".',
     annotations: ANNOTATIONS,
     inputSchema: {
-      ico: z.string().optional().describe('8-miestne IČO'),
-      name: z.string().optional().describe('Názov firmy — použije sa, len ak nie je zadané ico'),
+      ico: z.string().max(20).optional().describe('8-miestne IČO'),
+      name: z.string().max(200).optional().describe('Názov firmy (aspoň 3 znaky) — zadaj buď ico, alebo name, nie oboje'),
       years: z.number().int().min(1).max(10).default(3),
       sections: z.array(z.enum(CHECK_SECTIONS)).min(1)
         .default([...CHECK_SECTIONS])
