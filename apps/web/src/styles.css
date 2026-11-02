@@ -86,7 +86,11 @@ h3 { font-size: 1.05rem; }
   font: inherit; font-weight: 600; border: 0; border-radius: var(--radius); cursor: pointer;
   background: var(--accent); color: var(--accent-text); padding: 0 22px;
 }
+.search button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .search button:disabled { opacity: 0.55; cursor: default; }
+.search button[aria-busy='true'] { opacity: 0.85; }
+.btn-spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-top-color: transparent; animation: spin 0.8s linear infinite; flex: none; }
+.results { scroll-margin-top: 12px; }
 .search-hint { color: var(--muted); font-size: 0.925rem; margin-top: 10px; }
 .search-hint strong { color: var(--text); font-weight: 600; }
 .search-notice {
@@ -139,7 +143,9 @@ h3 { font-size: 1.05rem; }
 .tabs { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
 .tabs button { font: inherit; font-size: 0.875rem; border: 0; background: none; color: var(--muted); padding: 6px 12px; border-radius: 7px; cursor: pointer; }
 .tabs button[aria-selected='true'] { background: var(--surface-2); color: var(--text); font-weight: 600; }
-.body { padding: 20px; display: grid; gap: 22px; }
+/* minmax(0, 1fr): bez neho sa stĺpec roztiahne na šírku tabuľky a karta ju odreže namiesto posúvania */
+.body { padding: 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+.verdict h2, .cand-name { overflow-wrap: anywhere; }
 .body section h3 { display: flex; align-items: center; gap: 8px; }
 .flags { margin: 0; padding-left: 20px; }
 .flags li { margin: 4px 0; }
@@ -149,7 +155,11 @@ h3 { font-size: 1.05rem; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 6px; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; }
-.table-scroll { overflow-x: auto; }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+.table-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* rok ostáva viditeľný pri posúvaní do boku */
+table.fin th:first-child, table.fin td:first-child { position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.swipe-hint { display: none; margin: 0 0 4px; font-size: 0.8rem; color: var(--muted); }
 table { border-collapse: collapse; width: 100%; font-size: 0.925rem; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 thead th { color: var(--muted); font-weight: 600; font-size: 0.825rem; }
@@ -194,4 +204,15 @@ ul.plain { padding-left: 0; list-style: none; display: grid; gap: 10px; }
   .search button { padding: 12px; }
   .facts { grid-template-columns: 1fr; gap: 0; }
   .facts dd { margin-bottom: 8px; }
+  .swipe-hint { display: block; }
+  .body, .verdict { padding: 16px; }
+  /* dlhy: veriteľ na samostatnom riadku, pod ním stav a dátum zoznamu */
+  table.kv, table.kv tbody { display: block; }
+  table.kv tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  table.kv th, table.kv td { padding: 0; border: 0; width: auto; }
+  table.kv th { flex: 1 0 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }

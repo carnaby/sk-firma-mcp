@@ -170,8 +170,10 @@ export function CheckResult({ report, markdown }: { report: CheckReportJson; mar
           <section>
             <h3>Financie</h3>
             {report.financials.length > 0 ? (
-              <div className="table-scroll">
-                <table>
+              <>
+              <p className="swipe-hint">Tabuľku posuň prstom do boku →</p>
+              <div className="table-scroll" tabIndex={0} aria-label="Financie po rokoch">
+                <table className="fin">
                   <thead>
                     <tr><th>Rok</th><th>Tržby</th><th>Medziročne</th><th>Výsledok</th><th>Vlastné imanie</th><th>Zadlženosť</th></tr>
                   </thead>
@@ -189,6 +191,7 @@ export function CheckResult({ report, markdown }: { report: CheckReportJson; mar
                   </tbody>
                 </table>
               </div>
+              </>
             ) : (
               <p className="muted">
                 {report.financials_unavailable_reason ? FIN_UNAVAILABLE[report.financials_unavailable_reason] : 'Údaje nie sú k dispozícii.'}

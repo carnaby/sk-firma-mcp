@@ -14,10 +14,20 @@ function readQuery(): string {
   return new URLSearchParams(window.location.search).get('q') ?? '';
 }
 
+/** Posunie stránku k výsledkom, ak ich začiatok nie je na obrazovke (na mobile sú pod nápovedou). */
+function revealResults(el: HTMLElement | null) {
+  if (!el) return;
+  const top = el.getBoundingClientRect().top;
+  if (top >= 0 && top <= window.innerHeight - 160) return;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+}
+
 export function App() {
   const [input, setInput] = useState(readQuery);
   const [state, setState] = useState<State>({ status: 'idle' });
   const abortRef = useRef<AbortController | null>(null);
+  const resultsRef = useRef<HTMLElement | null>(null);
 
   const run = useCallback(async (raw: string, pushHistory = true) => {
     const q = raw.trim();
@@ -54,6 +64,11 @@ export function App() {
     return () => window.removeEventListener('popstate', onPop);
   }, [run]);
 
+  // nový stav (načítanie, zoznam, výsledok, chyba) musí byť vidno aj na mobile
+  useEffect(() => {
+    if (state.status !== 'idle') revealResults(resultsRef.current);
+  }, [state]);
+
   const busy = state.status === 'loading';
 
   return (
@@ -82,7 +97,12 @@ export function App() {
 
             <form
               className="search"
-              onSubmit={(e) => { e.preventDefault(); void run(input); }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                // na dotykových zariadeniach schovaj klávesnicu, inak zakrýva výsledky
+                if (window.matchMedia('(pointer: coarse)').matches) (document.activeElement as HTMLElement | null)?.blur();
+                void run(input);
+              }}
               role="search"
             >
               <label htmlFor="q" className="sr-only">IČO alebo názov firmy</label>
@@ -96,7 +116,8 @@ export function App() {
                 autoFocus
                 aria-describedby="q-hint"
               />
-              <button type="submit" disabled={busy || !input.trim()}>
+              <button type="submit" disabled={busy || !input.trim()} aria-busy={busy}>
+                {busy && <span className="btn-spinner" aria-hidden />}
                 {busy ? 'Overujem…' : 'Preveriť'}
               </button>
             </form>
@@ -115,7 +136,7 @@ export function App() {
           </div>
         </section>
 
-        <section className="wrap results" aria-live="polite">
+        <section className="wrap results" aria-live="polite" ref={resultsRef}>
           {state.status === 'loading' && (
             <div className="card loading">
               <div className="spinner" aria-hidden />
