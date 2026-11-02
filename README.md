@@ -1,5 +1,7 @@
 # SK Firma — Slovak company check (web + MCP)
 
+[![CI](https://github.com/carnaby/sk-firma-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/carnaby/sk-firma-mcp/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **English** · [Slovensky](README.sk.md)
 
 **Try it:** [firma.carnaby.sk](https://firma.carnaby.sk) · MCP connector `https://firma.carnaby.sk/mcp`
