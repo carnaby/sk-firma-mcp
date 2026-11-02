@@ -182,12 +182,47 @@ describe('remote MCP (/mcp)', () => {
     expect(((await res.json()) as { error: { message: string } }).error.message).toMatch(/batch/i);
   });
 
-  it('volania nástrojov majú vlastný denný limit na IP', async () => {
-    const app = createApp({ deps: deps(), limits: { mcpToolCallsPerDay: 1 } });
+  it('denný limit previerok je spoločný pre web aj MCP; lacné volania sa nerátajú', async () => {
+    const app = createApp({ deps: deps(), limits: { apiPerDay: 2 } });
     expect((await rpc(app, toolCall(1))).status).toBe(200);
-    expect((await rpc(app, { jsonrpc: '2.0', id: 2, method: 'tools/list' })).status).toBe(200); // lacné volania sa nerátajú
-    const res = await rpc(app, toolCall(3));
+    expect((await rpc(app, { jsonrpc: '2.0', id: 2, method: 'tools/list' })).status).toBe(200);
+    expect((await get(app, '/api/check?q=11111111')).status).toBe(200);
+    expect((await get(app, '/api/check?q=11111111')).status).toBe(429);
+  });
+
+  it('prekročený limit nástroja → JSON-RPC výsledok s isError a zrozumiteľným textom (nie HTTP 429)', async () => {
+    const app = createApp({ deps: deps(), limits: { apiPerDay: 1 } });
+    await rpc(app, toolCall(1));
+    const res = await rpc(app, toolCall(2));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: number; result: { isError: boolean; content: { text: string }[] } };
+    expect(body.id).toBe(2);
+    expect(body.result.isError).toBe(true);
+    expect(body.result.content[0].text).toMatch(/limit/);
+  });
+
+  it('drahšie volanie (viac rokov financií) sa ráta viackrát', async () => {
+    const app = createApp({ deps: deps(), limits: { apiPerDay: 4 } });
+    const fin10 = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'skfirma_financials', arguments: { ico: '11111111', years: 10 } } };
+    expect((await rpc(app, fin10)).status).toBe(200); // 4 jednotky
+    expect((await get(app, '/api/check?q=11111111')).status).toBe(429);
+  });
+
+  it('IPv6: súhrnný denný strop na sieť /48 (veľa /64 jedného poskytovateľa)', async () => {
+    const app = createApp({ deps: deps(), trustProxy: 'cloudflare', limits: { apiPerDay: 100, netPerDay: 2 } });
+    const req = (ip: string) => app.request('/api/check?q=11111111', { headers: { 'cf-connecting-ip': ip } });
+    expect((await req('2001:db8:1:1::1')).status).toBe(200);
+    expect((await req('2001:db8:1:2::1')).status).toBe(200);
+    expect((await req('2001:db8:1:3::1')).status).toBe(429);
+    expect((await req('2001:db8:2:1::1')).status).toBe(200); // iná /48
+  });
+
+  it('prekročený všeobecný limit /mcp → JSON-RPC chyba', async () => {
+    const app = createApp({ deps: deps(), limits: { mcpPerMinute: 1 } });
+    await rpc(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    const res = await rpc(app, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
     expect(res.status).toBe(429);
+    expect(((await res.json()) as { jsonrpc: string; error: { message: string } }).error.message).toMatch(/Príliš veľa/);
   });
 
   it('príliš veľké telo /mcp → 413', async () => {

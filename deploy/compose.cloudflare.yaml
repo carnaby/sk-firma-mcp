@@ -25,11 +25,11 @@ services:
       TRUST_PROXY: cloudflare
       # Limity — defaulty sú rozumné, odkomentuj len ak treba
       # RATE_LIMIT_API_PER_MINUTE: "20"
-      # RATE_LIMIT_API_PER_DAY: "300"
+      # RATE_LIMIT_API_PER_DAY: "300"   # spolu web aj MCP
       # RATE_LIMIT_MCP_PER_MINUTE: "60"
       # RATE_LIMIT_MCP_PER_DAY: "1500"
       # RATE_LIMIT_TOOLS_PER_MINUTE: "20"
-      # RATE_LIMIT_TOOLS_PER_DAY: "300"
+      # RATE_LIMIT_NET_PER_DAY: "3000"
       # SKFIRMA_ADMIN_TOKEN: "dlhy-nahodny-retazec"   # detailný /api/health
       # SKFIRMA_UPSTREAM_DAILY_BUDGET: "20000"
       # SKFIRMA_UPSTREAM_MAX_QUEUE: "20"

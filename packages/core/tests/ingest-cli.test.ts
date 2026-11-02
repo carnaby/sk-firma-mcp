@@ -129,4 +129,38 @@ describe('runIngest E2E', () => {
     expect(idx.spDebt('77777777')).toEqual({ amount_eur: 47.71, as_of: '2026-07-06' });
     expect(idx.taxDebtorCandidates('firma sedem s r o')?.candidates).toHaveLength(1);
   });
+
+  it('veľký pokles sa odmietne, s SKFIRMA_INGEST_ACCEPT_SHRINK sa prijme', async () => {
+    const indexPath = join(dir, 'index.sqlite');
+    mockAll();
+    await runIngest({ indexPath, now: () => new Date('2026-07-13T05:00:00Z') }); // SP: 3 záznamy
+
+    const [header, firstRow] = fixture('sp.csv').toString('utf8').split(/\r?\n/);
+    const shrunkRun = async () => {
+      const fs2 = mockAgent.get('https://report.financnasprava.sk');
+      fs2.intercept({ path: '/ds_dphs.zip', headers: { 'if-none-match': '"v1"' } }).reply(304);
+      for (const f of ['dsdd', 'dphv', 'dphz']) fs2.intercept({ path: `/ds_${f}.zip` }).reply(503, 'down');
+      const sp = mockAgent.get('https://www.socpoist.sk');
+      sp.intercept({ path: '/nastroje-sluzby/zoznam-dlznikov' })
+        .reply(200, '<html><a href="/api/idsp/download/12345678-1111-2222-3333-444444444444">Stiahnuť</a></html>');
+      sp.intercept({ path: '/api/idsp/download/12345678-1111-2222-3333-444444444444' })
+        .reply(200, Buffer.from(zipSync({ 'dlznici_29_2026.csv': strToU8(`${header}\n${firstRow}\n`) })));
+      mockAgent.get('https://s3.eu-central-1.amazonaws.com')
+        .intercept({ path: '/ekosystem-slovensko-digital-dumps/vszp.sql.gz' }).reply(503, 'down');
+      const s = await runIngest({ indexPath, now: () => new Date('2026-07-14T05:00:00Z') });
+      return s.find((x) => x.dataset === 'sp_debtors')!;
+    };
+
+    const rejected = await shrunkRun();
+    expect(rejected.status).toBe('carried');
+    expect(rejected.error).toMatch(/SKFIRMA_INGEST_ACCEPT_SHRINK=sp_debtors/);
+
+    process.env.SKFIRMA_INGEST_ACCEPT_SHRINK = 'sp_debtors';
+    try {
+      const accepted = await shrunkRun();
+      expect(accepted).toMatchObject({ status: 'fresh', records: 1 });
+    } finally {
+      delete process.env.SKFIRMA_INGEST_ACCEPT_SHRINK;
+    }
+  });
 });

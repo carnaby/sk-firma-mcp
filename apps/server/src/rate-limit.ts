@@ -11,7 +11,8 @@ export class RateLimiter {
     return this.hits.size;
   }
 
-  hit(key: string): { allowed: boolean; retryAfterMs: number } {
+  /** cost = koľko jednotiek limitu požiadavka spotrebuje (drahšie volania viac) */
+  hit(key: string, cost = 1): { allowed: boolean; retryAfterMs: number } {
     const now = this.opts.now?.() ?? Date.now();
     this.sweep(now);
     let e = this.hits.get(key);
@@ -20,7 +21,7 @@ export class RateLimiter {
       e = { count: 0, resetAt: now + this.opts.windowMs };
       this.hits.set(key, e);
     }
-    e.count++;
+    e.count += cost;
     return e.count <= this.opts.limit
       ? { allowed: true, retryAfterMs: 0 }
       : { allowed: false, retryAfterMs: e.resetAt - now };
@@ -38,7 +39,8 @@ export class RateLimiter {
   }
 
   private sweep(now: number): void {
-    if (now - this.lastSweep < this.opts.windowMs) return;
+    // aspoň každých 10 min — expirované kľúče (IP adresy) nedržíme v pamäti dlhšie, než treba
+    if (now - this.lastSweep < Math.min(this.opts.windowMs, 10 * 60_000)) return;
     this.lastSweep = now;
     for (const [k, e] of this.hits) if (e.resetAt <= now) this.hits.delete(k);
   }

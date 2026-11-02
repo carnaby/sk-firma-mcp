@@ -65,6 +65,8 @@ export const CONFIG = {
     downloadTimeoutMs: 120_000, // najväčší súbor ~18 MB + pomalé linky
     // nový zoznam s menej ako touto časťou záznamov predchádzajúceho = pravdepodobne rozbitý zdroj → ponechaj starý
     minRetainRatio: 0.5,
+    // núdzový východ, keď zoznam legitímne klesne (napr. zdroj zvýši prah zverejnenia): datasety oddelené čiarkou
+    get acceptShrink() { return (process.env.SKFIRMA_INGEST_ACCEPT_SHRINK ?? '').split(',').map((s) => s.trim()).filter(Boolean); },
   },
   disclaimer: 'Informatívny výstup z verejných registrov, nie úverový rating ani právne posúdenie.',
 } as const;

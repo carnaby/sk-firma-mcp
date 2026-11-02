@@ -32,7 +32,7 @@ const app = createApp({
     mcpPerMinute: num(env.RATE_LIMIT_MCP_PER_MINUTE, DEFAULT_LIMITS.mcpPerMinute),
     mcpPerDay: num(env.RATE_LIMIT_MCP_PER_DAY, DEFAULT_LIMITS.mcpPerDay),
     mcpToolCallsPerMinute: num(env.RATE_LIMIT_TOOLS_PER_MINUTE, DEFAULT_LIMITS.mcpToolCallsPerMinute),
-    mcpToolCallsPerDay: num(env.RATE_LIMIT_TOOLS_PER_DAY, DEFAULT_LIMITS.mcpToolCallsPerDay),
+    netPerDay: num(env.RATE_LIMIT_NET_PER_DAY, DEFAULT_LIMITS.netPerDay),
   },
   adminToken: env.SKFIRMA_ADMIN_TOKEN || undefined,
 });

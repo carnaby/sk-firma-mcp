@@ -199,7 +199,8 @@ export async function checkCompany(
           return mapEntityToProfile(await deps.rpo.getEntity(c.rpo_id, false), now());
         })()
       : Promise.resolve(null),
-    wantFin ? deps.ruz.financials(icoNorm, years) : Promise.resolve(null),
+    // riziko potrebuje aspoň 2 roky (medziročný pokles tržieb), aj keď sa zobrazí menej
+    wantFin ? deps.ruz.financials(icoNorm, Math.max(years, 2)) : Promise.resolve(null),
     wantDebts ? fetchDebts(icoNorm, { index: deps.index, dovera: deps.dovera, rpo: deps.rpo }) : Promise.resolve(null),
     wantVat
       ? (async (): Promise<VatStatusData> => {
@@ -238,7 +239,8 @@ export async function checkCompany(
     : null;
   const staleIndexDays = index_freshness?.stale ? index_freshness.age_days : null;
   const risk = evaluateRisk({ profile, financials, debts, vat, completeness, now: now(), staleIndexDays });
-  return { kind: 'report', ico: icoNorm, risk, profile, financials, debts, vat, failed_sections, index_freshness };
+  const shown = financials && financials.years.length > years ? { ...financials, years: financials.years.slice(0, years) } : financials;
+  return { kind: 'report', ico: icoNorm, risk, profile, financials: shown, debts, vat, failed_sections, index_freshness };
 }
 
 /** Stabilný JSON tvar previerky — rovnaký pre MCP (response_format=json) aj HTTP API. */

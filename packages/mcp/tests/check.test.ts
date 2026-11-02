@@ -53,6 +53,29 @@ describe('skfirma_check', () => {
     expect(md).toMatch(/_Informatívny výstup/);
   });
 
+  it('years=1: riziko sa aj tak počíta z 2 rokov (pokles tržieb), zobrazí sa 1 rok', async () => {
+    let requested = 0;
+    const twoYears: FinancialsResult = {
+      ...healthyFin,
+      years: [
+        { ...healthyFin.years[0], revenue: 500_000, revenue_yoy: -0.5 },
+        { ...healthyFin.years[0], period_from: '2023-01', period_to: '2023-12', period_label: '2023', statement_id: 2, revenue: 1_000_000, revenue_yoy: null },
+      ],
+    };
+    const d: Deps = {
+      rpo: { searchByIco: async () => candidate('11111111', 'Firma Jeden s. r. o.', 1000001),
+             searchByName: async () => [], getEntity: async () => firma1Entity },
+      ruz: { financials: async (_ico, years) => { requested = years; return twoYears; } },
+      index: unavailableIndex,
+      dovera: unavailableDovera,
+      now: () => new Date('2026-07-12'),
+    };
+    const md = (await call(d, { ico: '11111111', years: 1 })).content[0].text;
+    expect(requested).toBeGreaterThanOrEqual(2);
+    expect(md).toMatch(/tržby -50 %/);
+    expect(md).not.toMatch(/\| 2023 \|/);
+  });
+
   it('viacznačné meno → kandidáti, žiadny verdikt, nie je to error', async () => {
     const d: Deps = {
       rpo: { searchByIco: async () => null, getEntity: async () => firma1Entity,

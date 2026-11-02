@@ -225,8 +225,12 @@ export function App() {
               </p>
               <h3>Čo neukladáme</h3>
               <p>
-                Tvoje hľadania neukladáme. IP adresu držíme len v pamäti servera, najviac 24 hodín, kvôli limitom proti
-                zneužitiu. Návštevnosť meriame cez Umami bez cookies a bez textu hľadania.
+                Tvoje hľadania neukladáme. IP adresu držíme len v pamäti aplikácie, približne 24 hodín, kvôli limitom
+                proti zneužitiu. Návštevnosť meriame cez Umami bez cookies a bez textu hľadania.
+              </p>
+              <p className="muted small">
+                Ako každý web, aj tento má pred sebou reverse proxy, ktorej technické záznamy (IP adresa, čas, adresa
+                požiadavky) slúžia len na prevádzku a bezpečnosť.
               </p>
             </div>
             <div>

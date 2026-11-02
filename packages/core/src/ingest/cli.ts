@@ -43,8 +43,9 @@ export async function runIngest(opts: { indexPath?: string; now?: () => Date } =
   const assertPlausible = (dataset: DatasetName, count: number): void => {
     if (count === 0) throw new Error('0 záznamov — prázdny zoznam, ponechávam predchádzajúci');
     const prev = previous.meta(dataset)?.record_count ?? 0;
-    if (prev > 0 && count < prev * CONFIG.ingest.minRetainRatio) {
-      throw new Error(`${count} záznamov oproti predchádzajúcim ${prev} — podozrivý pokles, ponechávam predchádzajúci`);
+    if (prev > 0 && count < prev * CONFIG.ingest.minRetainRatio && !CONFIG.ingest.acceptShrink.includes(dataset)) {
+      throw new Error(`${count} záznamov oproti predchádzajúcim ${prev} — podozrivý pokles, ponechávam predchádzajúci `
+        + `(ak je pokles skutočný, spusti ingest s SKFIRMA_INGEST_ACCEPT_SHRINK=${dataset})`);
     }
   };
 

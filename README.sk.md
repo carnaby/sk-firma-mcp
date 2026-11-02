@@ -163,7 +163,8 @@ posielať dopyty na RPO, RÚZ a Dôveru. Ochrana má dve úrovne:
 | Vrstva | Chráni pred | Default |
 |---|---|---|
 | Limit na IP — minúta | jedným klientom, ktorý klikne 100× | API 20/min, MCP 60/min, nástroje 20/min |
-| Limit na IP — deň | crawlerom z jednej adresy | API 300/deň, MCP 1 500/deň, nástroje 300/deň |
+| Limit na IP — deň | crawlerom z jednej adresy | 300 previerok/deň spolu za web aj MCP (financie za 10 rokov = 4 previerky), MCP 1 500 správ/deň |
+| Limit na sieť IPv6 /48 — deň | rotácii adries v rámci poskytovateľa | 3 000 previerok/deň |
 | Kľúč limitu, telo | obchádzaniu limitu | IPv6 sa ráta po sieti /64; JSON-RPC batch sa odmieta; telo `/mcp` max. 64 kB |
 | Cache + single-flight | opakovaným a súbežným dopytom na tú istú firmu | RPO 7 dní, RÚZ a Dôvera 1 deň |
 | Throttle na host | nárazom | ~2 req/s na RPO, RÚZ, Dôveru |
@@ -180,9 +181,11 @@ vynuluje a pri viacerých inštanciách by ich bolo treba zdieľať (Redis).
 | `SKFIRMA_INDEX_PATH` | `/data/skfirma-index.sqlite` (Docker) | cesta k SQLite indexu |
 | `SKFIRMA_INGEST_INTERVAL_HOURS` | `24` | `0` = vypnutý plánovaný ingest |
 | `TRUST_PROXY` | `none` | `cloudflare` = IP z `CF-Connecting-IP`; `xff` = posledná položka `X-Forwarded-For` (vlastná reverse proxy) |
-| `RATE_LIMIT_API_PER_MINUTE` / `_PER_DAY` | `20` / `300` | na IP pre `/api/check` a `/api/search` |
+| `RATE_LIMIT_API_PER_MINUTE` | `20` | na IP pre `/api/check` a `/api/search` |
+| `RATE_LIMIT_API_PER_DAY` | `300` | previerky na IP za deň, spolu za web (`/api`) aj MCP (`tools/call`) |
+| `RATE_LIMIT_NET_PER_DAY` | `3000` | previerky za deň na sieť IPv6 /48 |
 | `RATE_LIMIT_MCP_PER_MINUTE` / `_PER_DAY` | `60` / `1500` | na IP pre `/mcp` (jedno použitie nástroja = 2–4 volania) |
-| `RATE_LIMIT_TOOLS_PER_MINUTE` / `_PER_DAY` | `20` / `300` | na IP pre volania nástrojov (`tools/call`) cez `/mcp`; JSON-RPC batch sa odmieta |
+| `RATE_LIMIT_TOOLS_PER_MINUTE` | `20` | na IP pre volania nástrojov (`tools/call`) cez `/mcp`; JSON-RPC batch sa odmieta |
 | `SKFIRMA_ADMIN_TOKEN` | — | `Authorization: Bearer <token>` na `/api/health` vráti aj limity a spotrebu rozpočtu; bez neho len verejný stav |
 | `SKFIRMA_UPSTREAM_MAX_QUEUE` | `20` | max. čakajúcich dopytov na jeden zdroj |
 | `SKFIRMA_UPSTREAM_DAILY_BUDGET` | `20000` | max. dopytov na jeden zdroj za deň (UTC) |
