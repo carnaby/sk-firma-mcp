@@ -115,7 +115,7 @@ export class DatasetIndex {
     const m = this.meta('tax_debtors');
     if (!m) return undefined;
     const candidates = db
-      .prepare('SELECT name, psc, obec_norm, amount_eur FROM tax_debtors WHERE name_norm = ?')
+      .prepare('SELECT name, psc, obec_norm, street, amount_eur FROM tax_debtors WHERE name_norm = ?')
       .all(nameNorm) as unknown as TaxDebtorCandidate[];
     return { candidates, as_of: m.as_of };
   }

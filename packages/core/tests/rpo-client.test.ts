@@ -17,6 +17,7 @@ const firma1SearchResult = {
   fullNames: [{ value: 'Firma Jeden s. r. o.', validFrom: '2018-01-02' }],
   addresses: [{ validFrom: '2022-03-04', street: 'Vzorová', buildingNumber: '123/4', postalCodes: ['81101'], municipality: { value: 'Bratislava - mestská časť Staré Mesto' } }],
   establishment: '2018-01-02',
+  sourceRegister: { value: { value: 'Obchodný register', code: '1', codelistCode: 'CL010112' } },
 };
 
 beforeEach(() => {
@@ -43,6 +44,8 @@ describe('RpoClient', () => {
       established_on: '2018-01-02',
       rpo_id: 1000001,
       address: 'Vzorová 123/4, 81101 Bratislava - mestská časť Staré Mesto',
+      building_number: '123/4',
+      register_code: '1',
     });
   });
 

@@ -41,7 +41,12 @@ export async function fetchDebts(ico: string, deps: DebtsDeps): Promise<DebtsDat
     if (tax === undefined) {
       fs = unavailable(INGEST_NOTE);
     } else {
-      const match = matchTaxDebtor(tax.candidates, { psc: candidate.psc, municipality: candidate.municipality });
+      const match = matchTaxDebtor(tax.candidates, {
+        psc: candidate.psc,
+        municipality: candidate.municipality,
+        building_number: candidate.building_number,
+        unique_name: candidate.register_code === '1',
+      });
       if (match.status === 'debtor') {
         fs = { status: 'debtor', amount_eur: match.amount_eur, as_of: tax.as_of, match_confidence: match.confidence };
       } else if (match.status === 'unverifiable') {

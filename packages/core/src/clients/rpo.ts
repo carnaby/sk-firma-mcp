@@ -19,6 +19,7 @@ const SearchResult = z.object({
   }).passthrough()).optional(),
   establishment: z.string().optional(),
   termination: z.string().optional(),
+  sourceRegister: z.object({ value: z.object({ code: z.string().optional() }).passthrough().optional() }).passthrough().optional(),
 }).passthrough();
 const SearchResponse = z.object({ results: z.array(SearchResult).default([]) }).passthrough();
 
@@ -31,6 +32,8 @@ function toCandidate(r: z.infer<typeof SearchResult>): SearchCandidate {
     address,
     psc: a?.postalCodes?.[0] ?? null,
     municipality: a?.municipality?.value ?? null,
+    building_number: a?.buildingNumber ?? null,
+    register_code: r.sourceRegister?.value?.code ?? null,
     status: r.termination ? 'terminated' : 'active',
     established_on: r.establishment ?? null,
     terminated_on: r.termination ?? null,

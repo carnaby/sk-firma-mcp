@@ -4,7 +4,7 @@ import type { SearchCandidate } from '../src/types.js';
 
 const candidate: SearchCandidate = {
   ico: '77777777', name: 'Firma Sedem s. r. o.', address: 'Vzorová 123/4, 82101 Bratislava',
-  psc: '82101', municipality: 'Bratislava - mestská časť Ružinov',
+  psc: '82101', municipality: 'Bratislava - mestská časť Ružinov', building_number: '123/4', register_code: '1',
   status: 'active', established_on: '2019-01-01', terminated_on: null, rpo_id: 1,
 };
 
@@ -13,7 +13,7 @@ const deps = (over: Partial<DebtsDeps> = {}): DebtsDeps => ({
     available: () => true,
     spDebt: () => ({ amount_eur: 47.71, as_of: '2026-07-06' }),
     vszpDebt: () => null,
-    taxDebtorCandidates: () => ({ candidates: [{ name: 'Firma Sedem s. r. o.', psc: '82101', obec_norm: 'bratislava', amount_eur: 780 }], as_of: '2026-05-31' }),
+    taxDebtorCandidates: () => ({ candidates: [{ name: 'Firma Sedem s. r. o.', psc: '82101', obec_norm: 'bratislava', street: 'Iná 5', amount_eur: 780 }], as_of: '2026-05-31' }),
   },
   dovera: { lookup: async () => ({ status: 'not_found', as_of: '2026-07-13' }) },
   rpo: { searchByIco: async () => candidate },
@@ -21,6 +21,12 @@ const deps = (over: Partial<DebtsDeps> = {}): DebtsDeps => ({
 });
 
 describe('fetchDebts', () => {
+  it('živnostník (mimo obchodného registra): rovnaké meno a PSČ, iné číslo domu → FS unverifiable, nie dlžník', async () => {
+    const zivnostnik: SearchCandidate = { ...candidate, name: 'Ján Vzorový', register_code: '2' };
+    const d = await fetchDebts('77777777', deps({ rpo: { searchByIco: async () => zivnostnik } }));
+    expect(d.creditors.fs.status).toBe('unverifiable');
+    expect(d.creditors.fs.note).toMatch(/obchodného registra/);
+  });
   it('skladá všetkých veriteľov: FS exact match, SP dlžník, VšZP čistý, Union not_supported', async () => {
     const d = await fetchDebts('77777777', deps());
     expect(d.creditors.fs).toMatchObject({ status: 'debtor', amount_eur: 780, match_confidence: 'exact', as_of: '2026-05-31' });

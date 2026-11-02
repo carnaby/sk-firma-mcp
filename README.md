@@ -138,6 +138,8 @@ always reported as unavailable.
   are not mapped yet.
 - **Tax debtors list has no IČO** — matching is by normalized name and
   address; ambiguous matches are reported as unverifiable, never assigned.
+  Outside the Business Register (sole traders, associations) names are not
+  unique, so a match also requires the same postal code and house number.
 - **Publication thresholds and delays:** the tax office publishes debts
   over €170 with a lag of weeks, Social Insurance from €5, health insurers
   over €100. Every value carries its `as_of` date.

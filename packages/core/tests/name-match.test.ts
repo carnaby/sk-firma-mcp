@@ -4,7 +4,7 @@ import { normalizeName, normalizeObec, matchTaxDebtor } from '../src/domain/name
 describe('normalizeName', () => {
   it('diakritika, úvodzovky, interpunkcia, whitespace', () => {
     expect(normalizeName('"Firma  Sedem, s. r. o."')).toBe('firma sedem s r o');
-    expect(normalizeName('MÄSIARSTVO Čerešňa, a.s.')).toBe('masiarstvo ceresna a s');
+    expect(normalizeName('FIRMA Štvorlístok Ďaleko, a.s.')).toBe('firma stvorlistok daleko a s');
   });
   it('oreže insolvenčné sufixy, právnu formu nechá', () => {
     expect(normalizeName('Firma Deväť s. r. o. v likvidácii')).toBe('firma devat s r o');
@@ -27,8 +27,9 @@ describe('normalizeObec', () => {
 });
 
 describe('matchTaxDebtor', () => {
-  const c = (over = {}) => ({ name: 'X', psc: '82101', obec_norm: 'bratislava', amount_eur: 780, ...over });
-  const company = { psc: '821 01', municipality: 'Bratislava - mestská časť Ružinov' };
+  const c = (over = {}) => ({ name: 'X', psc: '82101', obec_norm: 'bratislava', street: 'Vzorová 12/3', amount_eur: 780, ...over });
+  // obchodný register: meno je zo zákona jedinečné
+  const company = { psc: '821 01', municipality: 'Bratislava - mestská časť Ružinov', building_number: '12/3', unique_name: true };
 
   it('0 kandidátov → not_found', () => {
     expect(matchTaxDebtor([], company)).toEqual({ status: 'not_found' });
@@ -48,7 +49,30 @@ describe('matchTaxDebtor', () => {
     expect(r.status).toBe('unverifiable');
   });
   it('chýbajúca adresa firmy → unverifiable, nie false positive', () => {
-    const r = matchTaxDebtor([c()], { psc: null, municipality: null });
+    const r = matchTaxDebtor([c()], { psc: null, municipality: null, building_number: null, unique_name: true });
     expect(r.status).toBe('unverifiable');
+  });
+
+  describe('subjekt mimo obchodného registra (živnostník, združenie) — meno nie je jedinečné', () => {
+    const person = { ...company, unique_name: false };
+    it('zhoda PSČ + čísla domu → exact', () => {
+      expect(matchTaxDebtor([c()], person)).toEqual({ status: 'debtor', amount_eur: 780, confidence: 'exact' });
+    });
+    it('číslo domu na konci ulice, rôzna interpunkcia', () => {
+      expect(matchTaxDebtor([c({ street: 'Nám. Sv. Trojice 12 / 3' })], person).status).toBe('debtor');
+      expect(matchTaxDebtor([c({ street: '12/3' })], person).status).toBe('debtor');
+    });
+    it('rovnaké PSČ, iné číslo domu → unverifiable', () => {
+      expect(matchTaxDebtor([c({ street: 'Vzorová 112/3' })], person).status).toBe('unverifiable');
+    });
+    it('zhoda len obce (iná mestská časť) → unverifiable, nie dlžník', () => {
+      const r = matchTaxDebtor([c({ psc: '85101' })], person);
+      expect(r.status).toBe('unverifiable');
+      if (r.status === 'unverifiable') expect(r.note).toMatch(/obchodného registra/);
+    });
+    it('chýba číslo domu → unverifiable', () => {
+      expect(matchTaxDebtor([c()], { ...person, building_number: null }).status).toBe('unverifiable');
+      expect(matchTaxDebtor([c({ street: null })], person).status).toBe('unverifiable');
+    });
   });
 });

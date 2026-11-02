@@ -585,7 +585,9 @@ hodnoty (tržby, ID výkazov, dátum `as_of`) sa pri reálnom subjekte menia.
 - **FS zoznam daňových dlžníkov nemá IČO** — párovanie na subjekt beží podľa
   normalizovaného názvu + adresy (`match_confidence: exact` = zhoda PSČ,
   `high` = zhoda len obce); pri nejednoznačnej zhode vráti `unverifiable`,
-  nikdy neriskuje false positive priradenie dlhu cudziemu subjektu.
+  nikdy neriskuje false positive priradenie dlhu cudziemu subjektu. Mimo
+  obchodného registra (živnostníci, združenia) meno nie je jedinečné, preto
+  sa vyžaduje zhoda PSČ aj čísla domu.
 - **Prahy zverejnenia zoznamov dlžníkov** — FS zverejňuje dlh len nad 170 €,
   Sociálna poisťovňa od 5 €, zdravotné poisťovne nad 100 €; nižšie dlhy sa
   v zdrojových zoznamoch vôbec nenachádzajú (nie je to chyba nástroja).

@@ -56,13 +56,13 @@ describe('skfirma_check', () => {
   it('viacznačné meno → kandidáti, žiadny verdikt, nie je to error', async () => {
     const d: Deps = {
       rpo: { searchByIco: async () => null, getEntity: async () => firma1Entity,
-             searchByName: async () => [candidate('33333330', 'STAV s.r.o.', 1), candidate('33333331', 'STAV plus s.r.o.', 2)] },
+             searchByName: async () => [candidate('33333330', 'Firma Tri s.r.o.', 1), candidate('33333331', 'Firma Tri plus s.r.o.', 2)] },
       ruz: { financials: async () => healthyFin },
       index: unavailableIndex,
       dovera: unavailableDovera,
       now: () => new Date('2026-07-12'),
     };
-    const res = await call(d, { name: 'STAV' });
+    const res = await call(d, { name: 'Firma Tri' });
     expect(res.isError).toBeFalsy();
     expect(res.content[0].text).toContain('33333330');
     expect(res.content[0].text).toContain('33333331');
