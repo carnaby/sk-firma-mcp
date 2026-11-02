@@ -71,6 +71,20 @@ describe('RuzClient.financials', () => {
     });
   });
 
+  it('stará firma: sťahuje závierky od najnovšej a skončí, keď má dosť rokov', async () => {
+    const pool = mockAgent.get(HOST);
+    mockApi(pool, '/uctovne-jednotky', { 'zmenene-od': '2000-01-01', ico: '11111111' }, { id: [100001] });
+    // 900–903 = staré roky; žiadna z nich nesmie byť stiahnutá (disableNetConnect → request by zlyhal)
+    mockApi(pool, '/uctovna-jednotka', { id: '100001' }, { id: 100001, ico: '11111111', nazovUJ: 'Firma Jeden s. r. o.', idUctovnychZavierok: [903, 900, 905, 902, 901, 904] });
+    mockApi(pool, '/uctovna-zavierka', { id: '905' }, { id: 905, obdobieOd: '2024-01', obdobieDo: '2024-12', typ: 'Riadna', idUctovnychVykazov: [555] });
+    mockApi(pool, '/uctovna-zavierka', { id: '904' }, { id: 904, obdobieOd: '2023-01', obdobieDo: '2023-12', typ: 'Riadna', idUctovnychVykazov: [555] });
+    mockApi(pool, '/uctovny-vykaz', { id: '555' }, vykaz687);
+    mockApi(pool, '/sablona', { id: '687' }, sablona687);
+
+    const r = await new RuzClient(new LruCache({ maxSize: 100 })).financials('11111111', 2);
+    expect(r.years.map((y) => y.period_label)).toEqual(['2024', '2023']);
+  });
+
   it('IFRS firma: prázdne tabuľky ⇒ ifrs_pdf_only + PDF prílohy s rokom, typom a attachment URL', async () => {
     const pool = mockAgent.get(HOST);
     mockApi(pool, '/uctovne-jednotky', { 'zmenene-od': '2000-01-01', ico: '33333333' }, { id: [7] });

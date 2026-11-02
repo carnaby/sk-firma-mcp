@@ -128,7 +128,9 @@ export function buildDatabase(
   }
 
   try {
-    if (existsSync(outPath)) rmSync(outPath);
+    // POSIX rename nahradí cieľ atomicky (index nikdy neexistuje „napoly"); Windows rename na existujúci
+    // súbor nedovolí, tam ho treba najprv zmazať.
+    if (process.platform === 'win32' && existsSync(outPath)) rmSync(outPath);
     renameSync(newPath, outPath);
   } catch (e) {
     throw new Error(`Nepodarilo sa nahradiť ${outPath} — zavri MCP server/klienta a spusti ingest znova. (${String(e)})`);

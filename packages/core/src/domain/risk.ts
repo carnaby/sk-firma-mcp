@@ -8,6 +8,8 @@ export interface RiskInput {
   vat: VatStatusData | null;
   completeness: Completeness;
   now: Date;
+  /** Vek lokálneho indexu dlžníkov/DPH v dňoch, ak je nad prahom (inak null) — dlhy a DPH potom nie sú aktuálne. */
+  staleIndexDays?: number | null;
 }
 export interface RiskResult {
   verdict: Verdict;
@@ -26,7 +28,7 @@ const monthsBetween = (fromIso: string, to: Date): number => {
   return months;
 };
 
-export function evaluateRisk({ profile, financials, debts, vat, completeness, now }: RiskInput): RiskResult {
+export function evaluateRisk({ profile, financials, debts, vat, completeness, now, staleIndexDays }: RiskInput): RiskResult {
   const flags: Flag[] = [];
 
   if (profile) {
@@ -91,6 +93,9 @@ export function evaluateRisk({ profile, financials, debts, vat, completeness, no
   }
 
   const incomplete = incompleteReasons(completeness, debts);
+  if (staleIndexDays != null) {
+    incomplete.push(`lokálny index dlžníkov a DPH je starý ${staleIndexDays} dní — dlhy a DPH nemusia zodpovedať súčasnosti`);
+  }
   const hasRed = flags.some((f) => RED.has(f.code));
   // Riziko a úplnosť sú dve osi: signál rozhoduje o 🟠/🔴, neúplnosť bez signálu = ⚪.
   const verdict: Verdict = hasRed ? 'red' : flags.length > 0 ? 'orange' : incomplete.length > 0 ? 'incomplete' : 'green';

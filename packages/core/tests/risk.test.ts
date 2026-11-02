@@ -35,6 +35,18 @@ function risk(input: Data & { now?: Date; requested?: Partial<typeof ALL> }) {
   return evaluateRisk({ ...data, completeness, now: now ?? NOW });
 }
 
+describe('evaluateRisk — starý lokálny index', () => {
+  it('bez signálu → ⚪ s dôvodom (dlhy a DPH nevieme posúdiť aktuálne)', () => {
+    const r = risk({ profile: profile(), financials: fin([year()]), debts: debts(), vat: vat(), staleIndexDays: 45, now: NOW });
+    expect(r.verdict).toBe('incomplete');
+    expect(r.incomplete.join(' ')).toMatch(/45 dní/);
+  });
+  it('so signálom ostáva 🟠/🔴, starý index je len poznámka', () => {
+    const r = risk({ profile: profile({ established_on: '2026-01-01' }), financials: fin([year()]), debts: debts(), vat: vat(), staleIndexDays: 45, now: NOW });
+    expect(r.verdict).toBe('orange');
+  });
+});
+
 describe('evaluateRisk', () => {
   it('zdravá firma → green bez flagov', () => {
     const r = risk({ profile: profile(), financials: fin([year()]), debts: debts(), vat: vat(), now: NOW });

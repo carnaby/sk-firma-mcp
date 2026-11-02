@@ -501,7 +501,8 @@ poznámka, bez signálu je verdikt ⚪ s dôvodmi. Nedostupná Dôvera ani Union
 verdikt nemenia. Každý verdikt okrem 🟢 má aspoň jeden dôvod. JSON výstup
 nesie `completeness` (stav každej sekcie a veriteľa) a `index_freshness`;
 ak je lokálny index starší ako `SKFIRMA_INDEX_STALE_DAYS` (default 30 dní),
-výstup to viditeľne hlási hneď pod verdiktom.
+výstup to viditeľne hlási hneď pod verdiktom a bez rizikového signálu je
+verdikt ⚪ — zo starých zoznamov sa dlhy a DPH posúdiť nedajú.
 
 **1. „Prever Firma Jeden pred podpisom kontraktu“**
 

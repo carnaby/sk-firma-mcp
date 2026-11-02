@@ -16,10 +16,22 @@ function periodLabel(from: string, to: string): string {
   return `${from}..${to}`;
 }
 
+/** "yyyy-MM" → poradové číslo mesiaca */
+const monthIndex = (ym: string): number => Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
+const lengthMonths = (y: YearInput): number => monthIndex(y.period_to) - monthIndex(y.period_from) + 1;
+const isFullYear = (y: YearInput): boolean => lengthMonths(y) === 12;
+
+/**
+ * YoY má zmysel len medzi dvoma celými, na seba nadväzujúcimi obdobiami. Pri medzere (rok len v PDF)
+ * alebo kratšom období (mimoriadna závierka, zmena hospodárskeho roka) by vyšiel falošný „pokles tržieb".
+ */
+const comparable = (prev: YearInput, cur: YearInput): boolean =>
+  isFullYear(prev) && isFullYear(cur) && monthIndex(cur.period_from) === monthIndex(prev.period_to) + 1;
+
 export function buildYears(inputs: YearInput[]): FinancialYear[] {
   const asc = [...inputs].sort((a, b) => a.period_to.localeCompare(b.period_to));
   const out: FinancialYear[] = asc.map((y, i) => {
-    const prev = i > 0 ? asc[i - 1].metrics : null;
+    const prev = i > 0 && comparable(asc[i - 1], y) ? asc[i - 1].metrics : null;
     const { trzby, vh_po_zdaneni, vlastne_imanie, aktiva_spolu, zavazky_celkom } = y.metrics;
     const revenue_yoy =
       trzby !== null && prev?.trzby != null && prev.trzby !== 0

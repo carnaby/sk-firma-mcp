@@ -78,12 +78,20 @@ export class RuzClient {
     if (!unit) return empty('no_statements');
     const name = unit.nazovUJ ?? null;
 
-    const zavierky = [];
-    for (const zid of unit.idUctovnychZavierok) {
-      zavierky.push(Zavierka.parse(await this.api(`/uctovna-zavierka?id=${zid}`)));
+    // ID závierok rastú s časom podania — ideme od najnovších a skončíme, keď máme dosť období.
+    // Stará firma má 20+ závierok; sťahovať všetky by míňalo denný rozpočet a spomaľovalo previerku.
+    const isCandidate = (zav: z.infer<typeof Zavierka>) =>
+      zav.konsolidovana !== true && (zav.typ === 'Riadna' || zav.typ === 'Mimoriadna');
+    const zavierky: z.infer<typeof Zavierka>[] = [];
+    const periods = new Set<string>();
+    for (const zid of [...unit.idUctovnychZavierok].sort((a, b) => b - a)) {
+      const zav = Zavierka.parse(await this.api(`/uctovna-zavierka?id=${zid}`));
+      zavierky.push(zav);
+      if (isCandidate(zav)) periods.add(zav.obdobieDo ?? '');
+      if (periods.size >= years) break;
     }
     const kandidati = zavierky
-      .filter((zav) => zav.konsolidovana !== true && (zav.typ === 'Riadna' || zav.typ === 'Mimoriadna'))
+      .filter(isCandidate)
       .sort((a, b) => (b.obdobieDo ?? '').localeCompare(a.obdobieDo ?? ''));
     const vybrane: typeof kandidati = [];
     for (const zav of kandidati) {

@@ -110,7 +110,8 @@ the reasons. An unavailable Dôvera or Union never changes the verdict, and
 every verdict except 🟢 states at least one reason. The JSON output carries
 `completeness` (per section and creditor) and `index_freshness`; an index
 older than `SKFIRMA_INDEX_STALE_DAYS` (default 30) is flagged right under
-the verdict.
+the verdict and, without a risk signal, makes it ⚪ — debts and VAT status
+can't be assessed from stale lists.
 
 ## Data sources
 

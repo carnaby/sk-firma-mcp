@@ -22,10 +22,13 @@ const STATUS_LABEL: Record<ProfileData['status'], string> = {
 
 export const estimateTokens = (text: string): number => Math.ceil(text.length / 3);
 
+/** Text do bunky markdown tabuľky: „|" v názve firmy by rozbil stĺpce. */
+const cell = (s: string): string => s.replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
+
 export function renderSearch(candidates: SearchCandidate[], total: number, hasMore: boolean, offset: number): string {
   if (candidates.length === 0) return 'Žiadny subjekt nezodpovedá dopytu. Skús kratší názov alebo over IČO.';
   const rows = candidates.map((c) =>
-    `| ${c.ico ?? '—'} | ${c.name} | ${c.address ?? '—'} | ${c.status === 'active' ? 'aktívna' : `zaniknutá ${c.terminated_on ?? ''}`.trim()} | ${c.established_on ?? '—'} |`);
+    `| ${c.ico ?? '—'} | ${cell(c.name)} | ${cell(c.address ?? '—')} | ${c.status === 'active' ? 'aktívna' : `zaniknutá ${c.terminated_on ?? ''}`.trim()} | ${c.established_on ?? '—'} |`);
   const totalLabel = total >= 500 ? '500+ (RPO strop)' : String(total);
   const footer = hasMore ? `\nĎalšie výsledky: offset=${offset + candidates.length}.` : '';
   return [

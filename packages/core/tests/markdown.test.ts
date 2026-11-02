@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmtEur, fmtPct, renderCheck, renderDebts, renderFinancials, renderVatStatus, estimateTokens } from '../src/render/markdown.js';
+import { fmtEur, fmtPct, renderCheck, renderDebts, renderFinancials, renderSearch, renderVatStatus, estimateTokens } from '../src/render/markdown.js';
 import type { Completeness, DebtsData, FinancialsResult, Flag, ProfileData, StatementAttachment, VatStatusData, Verdict } from '../src/types.js';
 import type { RiskResult } from '../src/domain/risk.js';
 
@@ -253,5 +253,15 @@ describe('renderCheck — dátumy a čerstvosť (P1-2)', () => {
     const md = renderCheck({ ...base, risk: risk('orange', [{ code: 'young_company', detail: 'vznik 2025-06-01 (< 24 mesiacov)', as_of: '2026-07-12', source: 'RPO, ŠÚ SR' }], ['financie chýbajú']) });
     expect(md).toContain('**Dôvody:** vznik 2025-06-01');
     expect(md).toContain('**Neúplné dáta** (verdikt nezhoršujú): financie chýbajú.');
+  });
+});
+
+describe('renderSearch', () => {
+  it('„|" v názve firmy nerozbije tabuľku', () => {
+    const md = renderSearch([{ ico: '11111111', name: 'Firma | Jeden s. r. o.', address: 'Vzorová 1', psc: null, municipality: null,
+      status: 'active', established_on: '2018-01-02', terminated_on: null, rpo_id: 1 }], 1, false, 0);
+    const row = md.split('\n').find((l) => l.startsWith('| 11111111'))!;
+    expect(row.split(/(?<!\\)\|/).length - 2).toBe(5); // 5 stĺpcov
+    expect(row).toContain('Firma \\| Jeden');
   });
 });

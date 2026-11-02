@@ -34,4 +34,29 @@ describe('buildYears', () => {
     ]);
     expect(years[0].revenue_yoy).toBeNull();
   });
+
+  it('YoY je null, keď predchádzajúce obdobie nenadväzuje (medziročná medzera, napr. rok len v PDF)', () => {
+    const years = buildYears([
+      { period_from: '2022-01', period_to: '2022-12', template: 'mikro UJ', statement_id: 7, metrics: m({ trzby: 200_000 }) },
+      { period_from: '2024-01', period_to: '2024-12', template: 'mikro UJ', statement_id: 6, metrics: m({ trzby: 50_000 }) },
+    ]);
+    expect(years[0].revenue_yoy).toBeNull();
+  });
+
+  it('YoY je null pri kratšom období (mimoriadna závierka, zmena hospodárskeho roka)', () => {
+    const years = buildYears([
+      { period_from: '2023-01', period_to: '2023-12', template: 'mikro UJ', statement_id: 9, metrics: m({ trzby: 200_000 }) },
+      { period_from: '2024-01', period_to: '2024-06', template: 'mikro UJ', statement_id: 8, metrics: m({ trzby: 90_000 }) },
+      { period_from: '2024-07', period_to: '2025-06', template: 'mikro UJ', statement_id: 10, metrics: m({ trzby: 210_000 }) },
+    ]);
+    expect(years.map((y) => y.revenue_yoy)).toEqual([null, null, null]);
+  });
+
+  it('nadväzujúci hospodársky rok YoY počíta', () => {
+    const years = buildYears([
+      { period_from: '2023-04', period_to: '2024-03', template: 'veľká UJ', statement_id: 12, metrics: m({ trzby: 100_000 }) },
+      { period_from: '2024-04', period_to: '2025-03', template: 'veľká UJ', statement_id: 11, metrics: m({ trzby: 120_000 }) },
+    ]);
+    expect(years[0].revenue_yoy).toBeCloseTo(0.2, 6);
+  });
 });

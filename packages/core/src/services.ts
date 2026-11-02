@@ -233,10 +233,11 @@ export async function checkCompany(
     requested: { profile: wantProfile, financials: wantFin, debts: wantDebts, vat: wantVat },
     profile, financials, debts, vat,
   });
-  const risk = evaluateRisk({ profile, financials, debts, vat, completeness, now: now() });
   const index_freshness = (wantDebts || wantVat) && deps.index.available()
     ? indexFreshness(deps.index.oldestFetchedAt?.() ?? null, now())
     : null;
+  const staleIndexDays = index_freshness?.stale ? index_freshness.age_days : null;
+  const risk = evaluateRisk({ profile, financials, debts, vat, completeness, now: now(), staleIndexDays });
   return { kind: 'report', ico: icoNorm, risk, profile, financials, debts, vat, failed_sections, index_freshness };
 }
 
