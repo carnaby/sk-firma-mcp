@@ -17,7 +17,7 @@ export interface RiskResult {
   completeness: Completeness;
 }
 
-const RED = new Set(['terminated', 'insolvency', 'negative_equity', 'vat_erased_52_8', 'vat_risky_52_6', 'debtor_major']);
+const RED = new Set(['terminated', 'insolvency', 'negative_equity', 'vat_risky_52_6', 'debtor_major']);
 
 const monthsBetween = (fromIso: string, to: Date): number => {
   const from = new Date(fromIso);
@@ -63,11 +63,12 @@ export function evaluateRisk({ profile, financials, debts, vat, completeness, no
 
   if (vat) {
     const src = 'financnasprava.sk';
-    if (vat.erased) {
-      flags.push({ code: 'vat_erased_52_8', detail: `vymazaný platiteľ DPH (§52 ods. 8)${vat.erased.erased_on ? `, vymazaný ${vat.erased.erased_on}` : ''}`, as_of: vat.as_of, source: src });
-    }
     if (vat.risky) {
       flags.push({ code: 'vat_risky_52_6', detail: `v zozname rizikových platiteľov DPH (§52 ods. 6)${vat.risky.published_on ? `, zverejnený ${vat.risky.published_on}` : ''}`, as_of: vat.as_of, source: src });
+    } else if (vat.erased?.erased_on && monthsBetween(vat.erased.erased_on, now) < CONFIG.risk.vatRiskyRecentMonths) {
+      // FS „zoznam vymazaných platiteľov" = vymazaní zo zoznamu rizikových (nedostatky odstránili alebo im zrušili
+      // registráciu) — nie sankcia. Nedávny výmaz stojí za pozornosť, starší je len informácia v sekcii DPH.
+      flags.push({ code: 'vat_risky_recent', detail: `do ${vat.erased.erased_on} v zozname rizikových platiteľov DPH${vat.erased.published_on ? ` (zverejnený ${vat.erased.published_on})` : ''}`, as_of: vat.as_of, source: src });
     }
   }
 

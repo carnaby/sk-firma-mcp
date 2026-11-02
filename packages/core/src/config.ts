@@ -30,6 +30,7 @@ export const CONFIG = {
     youngCompanyMonths: 24,
     noRecentStatementsPeriods: 2, // žiadna závierka za posledné 2 uzavreté obdobia
     debtorMajorThresholdEur: 1_000, // dlh FS+SP+ZP spolu > 1 000 € = 🔴; ≤ = 🟠
+    vatRiskyRecentMonths: 12, // výmaz zo zoznamu rizikových platiteľov DPH v tomto okne = 🟠, starší len info
   },
   check: {
     maxSearchCandidates: 5, // pri viacznačnom mene v skfirma_check

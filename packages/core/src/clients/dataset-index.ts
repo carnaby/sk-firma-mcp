@@ -73,19 +73,20 @@ export class DatasetIndex {
   vatStatus(query: { ico?: string; icDph?: string }): VatRows | null {
     const db = this.open();
     if (!db) return null;
-    const lookup = <T>(table: string): T | null => {
+    // order: subjekt môže byť v zozname viackrát (napr. opakovane zaradený a vymazaný) — berieme najnovší
+    const lookup = <T>(table: string, order = ''): T | null => {
       if (query.icDph) {
-        const byDph = db.prepare(`SELECT * FROM ${table} WHERE ic_dph = ?`).get(query.icDph) as T | undefined;
+        const byDph = db.prepare(`SELECT * FROM ${table} WHERE ic_dph = ? ${order}`).get(query.icDph) as T | undefined;
         if (byDph) return byDph;
       }
       if (query.ico) {
-        return (db.prepare(`SELECT * FROM ${table} WHERE ico = ?`).get(query.ico) as T | undefined) ?? null;
+        return (db.prepare(`SELECT * FROM ${table} WHERE ico = ? ${order}`).get(query.ico) as T | undefined) ?? null;
       }
       return null;
     };
     return {
       payer: lookup<VatPayerRow>('vat_payers'),
-      erased: lookup<VatErasedRow>('vat_erased'),
+      erased: lookup<VatErasedRow>('vat_erased', 'ORDER BY erased_on DESC'),
       risky: lookup<VatRiskyRow>('vat_risky'),
       asOf: {
         payers: this.meta('vat_payers')?.as_of ?? null,

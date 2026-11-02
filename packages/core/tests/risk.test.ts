@@ -164,10 +164,26 @@ describe('evaluateRisk — debts a vat flagy (Fáza 2a)', () => {
     expect(r.flags.map((f) => f.code)).not.toContain('debtor_major');
     expect(r.verdict).toBe('orange');
   });
-  it('vymazaný platiteľ §52/8 → red', () => {
-    const r = risk({ profile: profile(), financials: fin([year()]), debts: debts(), vat: vat({ erased: { published_on: '2024-05-01', erased_on: '2024-06-01', violation_year: '2024' } }), now: NOW });
+  // „vymazaný" = vymazaný zo zoznamu rizikových platiteľov (spravidla nedostatky odstránil), nie sankcia
+  it('výmaz zo zoznamu rizikových do 12 mesiacov → vat_risky_recent (orange)', () => {
+    const r = risk({ profile: profile(), financials: fin([year()]), debts: debts(), vat: vat({ erased: { published_on: '2025-03-01', erased_on: '2025-09-15', violation_year: '2024' } }), now: NOW });
+    expect(r.verdict).toBe('orange');
+    const flag = r.flags.find((f) => f.code === 'vat_risky_recent')!;
+    expect(flag.detail).toMatch(/2025-09-15/);
+  });
+  it('starší výmaz zo zoznamu rizikových → bez flagu (len info v DPH sekcii)', () => {
+    const r = risk({ profile: profile(), financials: fin([year()]), debts: debts(), vat: vat({ erased: { published_on: '2014-02-05', erased_on: '2016-11-02', violation_year: '2013' } }), now: NOW });
+    expect(r.verdict).toBe('green');
+    expect(r.flags).toEqual([]);
+  });
+  it('výmaz presne pred 12 mesiacmi už flag nedáva', () => {
+    const r = risk({ profile: profile(), financials: fin([year()]), debts: debts(), vat: vat({ erased: { published_on: '2025-01-01', erased_on: '2025-07-12', violation_year: '2024' } }), now: NOW });
+    expect(r.flags.map((f) => f.code)).not.toContain('vat_risky_recent');
+  });
+  it('aktuálne rizikový + starší výmaz → len vat_risky_52_6', () => {
+    const r = risk({ profile: profile(), financials: fin([year()]), debts: debts(), vat: vat({ risky: { published_on: '2026-02-25', violation_year: '2025' }, erased: { published_on: '2025-03-01', erased_on: '2025-09-15', violation_year: '2024' } }), now: NOW });
     expect(r.verdict).toBe('red');
-    expect(r.flags.map((f) => f.code)).toContain('vat_erased_52_8');
+    expect(r.flags.map((f) => f.code)).toEqual(['vat_risky_52_6']);
   });
   it('rizikový platiteľ §52/6 → red', () => {
     const r = risk({ profile: profile(), financials: fin([year()]), debts: debts(), vat: vat({ risky: { published_on: '2023-02-25', violation_year: '2023' } }), now: NOW });

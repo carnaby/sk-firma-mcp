@@ -51,6 +51,18 @@ describe('DatasetIndex', () => {
     expect(v.asOf.payers).toBe('2026-07-12');
   });
 
+  it('vatStatus pri viacerých výmazoch zo zoznamu rizikových vráti najnovší', () => {
+    const path = join(dir, 'index.sqlite');
+    buildDatabase(path, {
+      vat_erased: { rows: [
+        { ico: '66666666', ic_dph: 'SK7066666666', name: 'Firma Šesť s. r. o.', violation_year: '2015', published_on: '2015-02-01', erased_on: '2016-04-01' },
+        { ico: '66666666', ic_dph: 'SK7066666666', name: 'Firma Šesť s. r. o.', violation_year: '2023', published_on: '2023-03-01', erased_on: '2025-09-15' },
+      ], meta: meta('vat_erased', '2026-07-12') },
+    });
+    const v = new DatasetIndex(path).vatStatus({ ico: '66666666' })!;
+    expect(v.erased?.erased_on).toBe('2025-09-15');
+  });
+
   it('spDebt SUMuje riadky; vszpDebt bez datasetu → undefined; neexistujúce IČO → null', () => {
     const path = join(dir, 'index.sqlite');
     makeDb(path);

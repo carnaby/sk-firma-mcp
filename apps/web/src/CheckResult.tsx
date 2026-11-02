@@ -236,7 +236,12 @@ export function CheckResult({ report, markdown }: { report: CheckReportJson; mar
                     : <>Nie je registrovaný pre DPH</>}
                 {report.vat.ic_dph && <>, IČ DPH <code>{report.vat.ic_dph}</code></>}
               </p>
-              {report.vat.erased && <p className="neg">Vymazaný platiteľ (§52 ods. 8){report.vat.erased.erased_on ? `, ${fmtDate(report.vat.erased.erased_on)}` : ''}</p>}
+              {report.vat.erased && !report.vat.risky && (
+                <p className="muted">
+                  V minulosti v zozname rizikových platiteľov{report.vat.erased.published_on ? ` (zverejnený ${fmtDate(report.vat.erased.published_on)})` : ''}
+                  {report.vat.erased.erased_on ? `, vymazaný zo zoznamu ${fmtDate(report.vat.erased.erased_on)}` : ''}.
+                </p>
+              )}
               {report.vat.risky && <p className="neg">V zozname rizikových platiteľov (§52 ods. 6){report.vat.risky.published_on ? `, zverejnený ${fmtDate(report.vat.risky.published_on)}` : ''}</p>}
               <p className="src">FS OpenData{report.vat.as_of ? `, zoznam k ${fmtDate(report.vat.as_of)}` : ''}</p>
             </section>

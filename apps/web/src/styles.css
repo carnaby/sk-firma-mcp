@@ -193,6 +193,7 @@ ul.plain { padding-left: 0; list-style: none; display: grid; gap: 10px; }
 .dot.red { background: var(--red); }
 .dot.orange { background: var(--orange); }
 .dot.green { background: var(--green); }
+.dot.grey { background: var(--muted); }
 
 .footer { margin-top: 56px; padding: 24px 0 40px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.875rem; }
 

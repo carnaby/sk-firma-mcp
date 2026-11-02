@@ -212,10 +212,10 @@ describe('renderVatStatus', () => {
     const md = renderVatStatus(vat({ registration_kind: '§7a', is_payer: false }));
     expect(md).toMatch(/NIE JE platiteľ/);
   });
-  it('vymazaný má 🔴 riadok', () => {
+  it('výmaz zo zoznamu rizikových je informácia, nie 🔴', () => {
     const md = renderVatStatus(vat({ erased: { published_on: '2024-05-01', erased_on: '2024-06-01', violation_year: '2024' } }));
-    expect(md).toContain('🔴');
-    expect(md).toMatch(/§52 ods\. 8|vymazaný/);
+    expect(md).not.toContain('🔴');
+    expect(md).toMatch(/v zozname rizikových platiteľov.*2024-05-01.*vymazaný.*2024-06-01/);
   });
 });
 

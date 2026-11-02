@@ -143,7 +143,7 @@ export function renderVatStatus(v: VatStatusData): string {
   } else {
     lines.push(`**DPH:** registrovaný podľa ${v.registration_kind} — NIE JE platiteľ DPH. IČ DPH ${v.ic_dph}.`);
   }
-  if (v.erased) lines.push(`🔴 Vymazaný platiteľ DPH (§52 ods. 8)${v.erased.erased_on ? `, vymazaný ${v.erased.erased_on}` : ''}.`);
+  if (v.erased) lines.push(`V minulosti v zozname rizikových platiteľov${v.erased.published_on ? ` (zverejnený ${v.erased.published_on})` : ''}${v.erased.erased_on ? `, vymazaný zo zoznamu ${v.erased.erased_on}` : ''}.`);
   if (v.risky) lines.push(`🔴 V zozname rizikových platiteľov (§52 ods. 6)${v.risky.published_on ? `, zverejnený ${v.risky.published_on}` : ''}.`);
   lines.push(`[FS OpenData, zoznam k ${v.as_of ?? '?'}]`);
   return lines.join('\n');

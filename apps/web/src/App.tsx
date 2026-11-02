@@ -189,7 +189,7 @@ export function App() {
               <ul className="plain">
                 <li><strong>RPO</strong> — Register právnických osôb (ŠÚ SR): identita, štatutári, právny stav. Živo.</li>
                 <li><strong>RÚZ</strong> — Register účtovných závierok (MF SR): tržby, výsledok, imanie. Živo.</li>
-                <li><strong>Finančná správa</strong> — daňoví dlžníci, platitelia / vymazaní / rizikoví platitelia DPH.</li>
+                <li><strong>Finančná správa</strong> — daňoví dlžníci, platitelia DPH a zoznam rizikových platiteľov DPH.</li>
                 <li><strong>Sociálna poisťovňa, VšZP, Dôvera</strong> — zoznamy dlžníkov.</li>
               </ul>
               <p className="muted small">
@@ -201,9 +201,10 @@ export function App() {
               <h3>Verdikt</h3>
               <p>Žiadne ML ani „skóre" — pevné pravidlá nad faktami, každé s uvedeným zdrojom:</p>
               <ul className="plain">
-                <li><span className="dot red" /> <strong>Vysoké riziko:</strong> zánik, likvidácia/konkurz/reštrukturalizácia, záporné vlastné imanie, vymazaný alebo rizikový platiteľ DPH, dlhy nad 1 000 €.</li>
-                <li><span className="dot orange" /> <strong>Zvýšené riziko:</strong> pokles tržieb o viac ako 30 %, zadlženosť nad 90 %, firma mladšia ako 2 roky, chýbajúce závierky, menšie dlhy, nedostupný zdroj.</li>
-                <li><span className="dot green" /> <strong>Bez zistení:</strong> nič z uvedeného — čo neznamená garanciu.</li>
+                <li><span className="dot red" /> <strong>Vysoké riziko:</strong> zánik, likvidácia/konkurz/reštrukturalizácia, záporné vlastné imanie, rizikový platiteľ DPH, dlhy nad 1 000 €.</li>
+                <li><span className="dot orange" /> <strong>Zvýšené riziko:</strong> pokles tržieb o viac ako 30 %, zadlženosť nad 90 %, firma mladšia ako 2 roky, chýbajúce závierky, menšie dlhy, výmaz zo zoznamu rizikových platiteľov DPH za posledný rok.</li>
+                <li><span className="dot green" /> <strong>Bez zistení:</strong> nič z uvedeného a všetky kľúčové zdroje odpovedali — čo neznamená garanciu.</li>
+                <li><span className="dot grey" /> <strong>Nedá sa posúdiť:</strong> žiadny rizikový signál, ale chýbajú kľúčové dáta (napr. závierka len v PDF, register neodpovedal). Neúplné dáta nie sú riziko — verdikt nikdy nezhoršia.</li>
               </ul>
             </div>
           </div>

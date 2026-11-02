@@ -109,7 +109,7 @@ subdomény (napr. `skfirma.tvojadomena.sk`, A/CNAME) mieri na tvoju
 verejnú IP.
 
 1. **Image na GHCR.** Po merge do `main` počkaj, kým dobehne workflow
-   *Docker image* (GitHub → Actions). Potom Packages → `sk-firma-mcp` →
+   *CI* (GitHub → Actions; image sa pushne až po zelených testoch). Potom Packages → `sk-firma-mcp` →
    Package settings → Change visibility → **Public**, aby si ho NAS
    stiahol bez prihlasovania. Stačí raz.
 2. **Kontajner.** Container Manager → Projekt → Vytvoriť → názov
@@ -139,7 +139,7 @@ verejnú IP.
 **Update:** automaticky cez [Watchtower](https://containrrr.dev/watchtower/)
 v režime `WATCHTOWER_LABEL_ENABLE=true` — `deploy/compose.yaml` má label
 `com.centurylinklabs.watchtower.enable=true`, takže nový `latest` po
-pushi do `main` (workflow *Docker image*) nasadí do ~5 min od zverejnenia
+pushi do `main` (workflow *CI*, image až po zelených testoch) nasadí do ~5 min od zverejnenia
 image. Ručne v Container Manageri: Projekt → `skfirma` → Akcia → Zostaviť,
 alebo cez SSH `docker compose pull && docker compose up -d`. Index vo
 volume ostáva.
@@ -196,7 +196,7 @@ Stiahne a spracuje 6 verejných datasetov (~50–100 MB spolu):
 
 | Dataset | Zdroj |
 |---|---|
-| Platitelia DPH, vymazaní platitelia, rizikoví platitelia (§52 ods. 6) | Finančná správa SR, OpenData ZIP export (`report.financnasprava.sk`) |
+| Platitelia DPH, rizikoví platitelia (§52 ods. 6) a vymazaní z tohto zoznamu | Finančná správa SR, OpenData ZIP export (`report.financnasprava.sk`) |
 | Daňoví dlžníci | Finančná správa SR, OpenData ZIP export |
 | Dlžníci Sociálnej poisťovne | Sociálna poisťovňa, verejný zoznam dlžníkov |
 | Dlžníci VšZP | Slovensko.Digital Datahub (SQL dump VšZP) |
@@ -428,8 +428,8 @@ _Prahy zverejnenia: FS > 170 €, SP ≥ 5 €, ZP > 100 €. Zoznamy nie sú re
 
 ### `skfirma_vat_status` — registrácia pre DPH
 
-Platiteľ/registrovaný (§4/§4b/§5 vs §7/§7a), vymazaný (§52/8), rizikový
-(§52/6) — z FS OpenData zoznamov. Zadaj `ico` alebo `ic_dph`. Vyžaduje
+Platiteľ/registrovaný (§4/§4b/§5 vs §7/§7a), rizikový (§52/6) a minulý
+výskyt v zozname rizikových (vymazaní platitelia) — z FS OpenData zoznamov. Zadaj `ico` alebo `ic_dph`. Vyžaduje
 lokálny index.
 
 _Príklady sú ilustračné s anonymizovanými údajmi._
@@ -480,11 +480,11 @@ sú všetky štyri.
 |---|---|---|
 | `terminated` | subjekt zaniknutý | 🔴 |
 | `insolvency` | konkurz, reštrukturalizácia alebo likvidácia (právny stav v RPO) | 🔴 |
-| `vat_erased_52_8` | vymazaný platiteľ DPH (§52 ods. 8) | 🔴 |
 | `vat_risky_52_6` | v zozname rizikových platiteľov DPH (§52 ods. 6) | 🔴 |
 | `debtor_major` | dlh FS + SP + ZP spolu > 1 000 € | 🔴 |
 | `negative_equity` | vlastné imanie < 0 v poslednej závierke | 🔴 |
 | `debtor_minor` | dlh > 0 a ≤ 1 000 € | 🟠 |
+| `vat_risky_recent` | vymazaný zo zoznamu rizikových platiteľov DPH za posledných 12 mesiacov (starší výmaz je len informácia) | 🟠 |
 | `no_recent_statements` | žiadna závierka za posledné 2 uzavreté obdobia | 🟠 |
 | `revenue_drop` | tržby medziročne < −30 % | 🟠 |
 | `young_company` | vznik pred menej ako 24 mesiacmi | 🟠 |
@@ -603,7 +603,7 @@ hodnoty (tržby, ID výkazov, dátum `as_of`) sa pri reálnom subjekte menia.
 |---|---|---|---|
 | **RPO** (Register právnických osôb) | Štatistický úrad SR, `api.statistics.sk/rpo/v1` | CC-BY 4.0 | identita, adresa, právny stav, štatutári, spoločníci, SK NACE |
 | **RÚZ** (Register účtovných závierok) | Ministerstvo financií SR, `registeruz.sk/cruz-public/api` | verejné dáta (CC0) | tržby, výsledok hospodárenia, vlastné imanie, aktíva/pasíva |
-| **FS OpenData** (Finančná správa SR) | `report.financnasprava.sk` (ZIP export) | verejné dáta | platitelia/vymazaní/rizikoví platitelia DPH, daňoví dlžníci |
+| **FS OpenData** (Finančná správa SR) | `report.financnasprava.sk` (ZIP export) | verejné dáta | platitelia DPH, rizikoví platitelia (aj vymazaní z tohto zoznamu), daňoví dlžníci |
 | **Sociálna poisťovňa** | `socpoist.sk`, verejný zoznam dlžníkov | verejné dáta | dlžníci SP |
 | **VšZP** | Slovensko.Digital **Datahub** (SQL dump), pôvodný zdroj VšZP | verejné dáta | dlžníci VšZP |
 | **Dôvera** | `dovera.sk`, verejné vyhľadávanie dlžníkov (bez API) | verejné dáta | dlžníci Dôvera |

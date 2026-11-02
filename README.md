@@ -61,7 +61,7 @@ or `json`.
 | `skfirma_profile` | Legal form, address, status (active / in liquidation / bankrupt / dissolved), statutory bodies, shareholders, main activity (SK NACE). |
 | `skfirma_financials` | Revenue, profit, equity, debt ratio and YoY revenue change from financial statements — derived metrics, not raw statements. For IFRS reporters (PDF only) it returns working links to the PDF attachments with year, type and size. |
 | `skfirma_debts` | Debtor status and amounts: Financial Administration (tax), Social Insurance Agency, health insurers VšZP and Dôvera. |
-| `skfirma_vat_status` | VAT registration, deregistered VAT payers (§52/8) and risky VAT payers (§52/6). Accepts `ico` or `ic_dph`. |
+| `skfirma_vat_status` | VAT registration, risky VAT payers (§52/6) and past entries on that list (removed payers). Accepts `ico` or `ic_dph`. |
 
 Example output of `skfirma_check` (fictitious company):
 
@@ -91,11 +91,11 @@ Worst-of over the flags below; no weights, no score. Thresholds live in
 |---|---|---|
 | `terminated` | company dissolved | 🔴 |
 | `insolvency` | bankruptcy, restructuring or liquidation (registry legal status) | 🔴 |
-| `vat_erased_52_8` | deregistered VAT payer (§52 (8)) | 🔴 |
 | `vat_risky_52_6` | on the list of risky VAT payers (§52 (6)) | 🔴 |
 | `debtor_major` | debts to tax office + insurers > €1,000 | 🔴 |
 | `negative_equity` | equity < 0 in the latest statement | 🔴 |
 | `debtor_minor` | debt > €0 and ≤ €1,000 | 🟠 |
+| `vat_risky_recent` | removed from the risky VAT payers list within the last 12 months (older removals are shown as information only) | 🟠 |
 | `no_recent_statements` | no statement for the last 2 closed periods | 🟠 |
 | `revenue_drop` | revenue YoY < −30 % | 🟠 |
 | `young_company` | younger than 24 months | 🟠 |
@@ -118,7 +118,7 @@ the verdict.
 |---|---|---|---|---|
 | RPO — register of legal entities | Statistical Office of the SR | CC-BY 4.0 | identity, status, people, NACE | live API |
 | RÚZ — register of financial statements | Ministry of Finance of the SR | public data | revenue, profit, equity, assets | live API |
-| FS OpenData | Financial Administration of the SR | public data | VAT payers / deregistered / risky, tax debtors | local index |
+| FS OpenData | Financial Administration of the SR | public data | VAT payers, risky VAT payers (and removals from that list), tax debtors | local index |
 | Debtors list | Social Insurance Agency | public data | social insurance debtors | local index |
 | VšZP debtors | Slovensko.Digital Datahub dump | public data | health insurance debtors | local index |
 | Dôvera debtors | dovera.sk public search | public data | health insurance debtors | live lookup |
