@@ -7,7 +7,7 @@ export function parseVszpSqlDump(sqlRaw: string): { rows: VszpDebtorRow[]; skipp
   // Tolerancia CRLF: dump aj fixture môžu prísť s \r\n (Windows checkout, proxy) — parser pracuje s \n
   const sql = sqlRaw.replace(/\r\n/g, '\n');
   const copyMatch = /COPY\s+(?:\S+\.)?debtors\s*\(([^)]+)\)\s+FROM\s+stdin;\n([\s\S]*?)\n\\\./.exec(sql);
-  if (!copyMatch) return { rows: [], skipped: 0, asOf: null };
+  if (!copyMatch) throw new Error('VšZP dump: nenašiel sa blok COPY debtors — zmena formátu dumpu?');
 
   const columns = copyMatch[1].split(',').map((c) => c.trim());
   const col = (name: string) => {

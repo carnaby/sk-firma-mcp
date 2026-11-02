@@ -21,8 +21,17 @@ function splitCsvLine(line: string): string[] {
   return out;
 }
 
+// Stĺpce čítame podľa pozície — hlavička musí sedieť, inak by zmena poradia potichu zahodila všetky riadky.
+// medzery ignorujeme: reálny súbor má „NÁZOV/MENO", staršie „NÁZOV / MENO"
+const EXPECTED_HEADER = ['NÁZOV/MENO', 'IČO', 'ADRESA', 'MESTO', 'DLŽNÁSUMA'];
+const normHeader = (h: string): string => h.toUpperCase().replace(/\s+/g, '');
+
 export function parseSpCsv(csv: string): { rows: SpDebtorRow[]; skippedNoIco: number } {
   const lines = csv.replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim().length > 0);
+  const header = splitCsvLine(lines[0] ?? '').map(normHeader);
+  if (EXPECTED_HEADER.some((h, i) => header[i] !== h)) {
+    throw new Error(`SP CSV: neočakávaná hlavička ${JSON.stringify(header.slice(0, EXPECTED_HEADER.length))} — zmena formátu?`);
+  }
   const rows: SpDebtorRow[] = [];
   let skippedNoIco = 0;
   for (const line of lines.slice(1)) { // [0] = hlavička

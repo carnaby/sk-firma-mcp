@@ -22,6 +22,12 @@ describe('parseSpCsv', () => {
   });
 });
 
+describe('parseSpCsv — zmena formátu', () => {
+  it('neznáma hlavička (zmena poradia/stĺpcov) → chyba, nie tichý prázdny zoznam', () => {
+    expect(() => parseSpCsv('"IČO","NÁZOV / MENO","ADRESA","MESTO","DLŽNÁ SUMA"\n"77777777","Firma","x","y","1,00"')).toThrow(/hlavičk/);
+  });
+});
+
 describe('spAsOfFromFilename', () => {
   it('odvodí ISO pondelok z názvu súboru', () => {
     expect(spAsOfFromFilename('dlznici_28_2026.csv')).toBe('2026-07-06');

@@ -97,4 +97,36 @@ describe('runIngest E2E', () => {
     expect(idx.vatStatus({ ico: '77777777' })?.payer?.kind).toBe('§4'); // carry-over
     expect(idx.spDebt('77777777')).toEqual({ amount_eur: 47.71, as_of: '2026-07-06' }); // carry-over
   });
+
+  it('prázdny alebo výrazne menší zoznam neprepíše dobrý index (failed → carried)', async () => {
+    mockAll();
+    const indexPath = join(dir, 'index.sqlite');
+    await runIngest({ indexPath, now: () => new Date('2026-07-13T05:00:00Z') });
+
+    // druhé kolo: SP vráti CSV len s hlavičkou, FS dlžníci XML bez položiek
+    const fs2 = mockAgent.get('https://report.financnasprava.sk');
+    fs2.intercept({ path: '/ds_dphs.zip', headers: { 'if-none-match': '"v1"' } }).reply(304);
+    const emptyDsdd = fixture('fs-dsdd.xml').toString('utf8').replace(/<ITEM>[\s\S]*<\/ITEM>/, '');
+    fs2.intercept({ path: '/ds_dsdd.zip' }).reply(200, Buffer.from(zipSync({ 'ds_dsdd.xml': strToU8(emptyDsdd) })), { headers: { etag: '"v3"' } });
+    fs2.intercept({ path: '/ds_dphv.zip' }).reply(503, 'down');
+    fs2.intercept({ path: '/ds_dphz.zip' }).reply(503, 'down');
+    const sp = mockAgent.get('https://www.socpoist.sk');
+    sp.intercept({ path: '/nastroje-sluzby/zoznam-dlznikov' })
+      .reply(200, '<html><a href="/api/idsp/download/12345678-1111-2222-3333-444444444444">Stiahnuť</a></html>');
+    const header = fixture('sp.csv').toString('utf8').split('\n')[0];
+    sp.intercept({ path: '/api/idsp/download/12345678-1111-2222-3333-444444444444' })
+      .reply(200, Buffer.from(zipSync({ 'dlznici_29_2026.csv': strToU8(header + '\n') })));
+    mockAgent.get('https://s3.eu-central-1.amazonaws.com')
+      .intercept({ path: '/ekosystem-slovensko-digital-dumps/vszp.sql.gz' }).reply(503, 'down');
+
+    const summary2 = await runIngest({ indexPath, now: () => new Date('2026-07-14T05:00:00Z') });
+    const byDataset = Object.fromEntries(summary2.map((s) => [s.dataset, s]));
+    expect(byDataset.sp_debtors.status).toBe('carried');
+    expect(byDataset.sp_debtors.error).toMatch(/0 záznamov|prázdny/);
+    expect(byDataset.tax_debtors.status).toBe('carried');
+
+    const idx = new DatasetIndex(indexPath);
+    expect(idx.spDebt('77777777')).toEqual({ amount_eur: 47.71, as_of: '2026-07-06' });
+    expect(idx.taxDebtorCandidates('firma sedem s r o')?.candidates).toHaveLength(1);
+  });
 });

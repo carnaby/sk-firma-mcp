@@ -38,6 +38,15 @@ export async function runIngest(opts: { indexPath?: string; now?: () => Date } =
   const fetchedAt = now().toISOString();
   const makeMeta = (dataset: DatasetName, asOf: string | null, url: string, etag: string | null): MetaRow =>
     ({ dataset, as_of: asOf ?? fetchedAt.slice(0, 10), fetched_at: fetchedAt, source_url: url, record_count: 0, etag });
+  // Prázdny alebo zrazu oveľa menší zoznam by znamenal „nikto nie je dlžník" → tichý falošný 🟢.
+  // Taký dataset berieme ako zlyhaný a ponecháme predchádzajúci (carry-over).
+  const assertPlausible = (dataset: DatasetName, count: number): void => {
+    if (count === 0) throw new Error('0 záznamov — prázdny zoznam, ponechávam predchádzajúci');
+    const prev = previous.meta(dataset)?.record_count ?? 0;
+    if (prev > 0 && count < prev * CONFIG.ingest.minRetainRatio) {
+      throw new Error(`${count} záznamov oproti predchádzajúcim ${prev} — podozrivý pokles, ponechávam predchádzajúci`);
+    }
+  };
 
   for (const { dataset, url, map } of FS_DATASETS) {
     try {
@@ -50,6 +59,7 @@ export async function runIngest(opts: { indexPath?: string; now?: () => Date } =
       const { text } = unzipSingle(result.body, '.xml');
       const parsed = parseFsXml(text);
       const rows = parsed.items.map(map).filter((r): r is NonNullable<typeof r> => r !== null);
+      assertPlausible(dataset, rows.length);
       // typovo bezpečné priradenie per dataset:
       (fresh as Record<string, unknown>)[dataset] = { rows, meta: makeMeta(dataset, parsed.asOf, url, result.etag) };
       summary.push({ dataset, status: 'fresh', records: rows.length, as_of: parsed.asOf });
@@ -62,6 +72,7 @@ export async function runIngest(opts: { indexPath?: string; now?: () => Date } =
     const { zip } = await fetchSpZip(CONFIG.ingest.spPageUrl);
     const { name, text } = unzipSingle(zip, '.csv');
     const { rows } = parseSpCsv(text);
+    assertPlausible('sp_debtors', rows.length);
     const asOf = spAsOfFromFilename(name);
     fresh.sp_debtors = { rows, meta: makeMeta('sp_debtors', asOf, CONFIG.ingest.spPageUrl, null) };
     summary.push({ dataset: 'sp_debtors', status: 'fresh', records: rows.length, as_of: asOf });
@@ -72,6 +83,7 @@ export async function runIngest(opts: { indexPath?: string; now?: () => Date } =
   try {
     const sql = await fetchVszpSql(CONFIG.ingest.vszpDumpUrl);
     const { rows, asOf } = parseVszpSqlDump(sql);
+    assertPlausible('vszp_debtors', rows.length);
     fresh.vszp_debtors = { rows, meta: makeMeta('vszp_debtors', asOf, CONFIG.ingest.vszpDumpUrl, null) };
     summary.push({ dataset: 'vszp_debtors', status: 'fresh', records: rows.length, as_of: asOf });
   } catch (e) {

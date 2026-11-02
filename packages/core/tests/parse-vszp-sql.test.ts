@@ -19,8 +19,8 @@ describe('parseVszpSqlDump', () => {
   it('asOf = najnovší published_on zahrnutých riadkov', () => {
     expect(r.asOf).toBe('2026-07-12');
   });
-  it('chýbajúci COPY blok → prázdny výsledok', () => {
-    expect(parseVszpSqlDump('SELECT 1;')).toEqual({ rows: [], skipped: 0, asOf: null });
+  it('chýbajúci COPY blok → chyba (zmena formátu dumpu nesmie dať prázdny zoznam = „nikto nie je dlžník")', () => {
+    expect(() => parseVszpSqlDump('SELECT 1;')).toThrow(/COPY/);
   });
   it('ignoruje decoy blok (archived_debtors) pred skutočným debtors blokom', () => {
     const cols = 'id, name, address, city, postal_code, amount, payer_type, published_on, created_at, updated_at, cin, health_care_claim';

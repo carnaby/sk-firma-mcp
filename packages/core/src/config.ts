@@ -63,6 +63,8 @@ export const CONFIG = {
     spPageUrl: 'https://www.socpoist.sk/nastroje-sluzby/zoznam-dlznikov',
     vszpDumpUrl: 'https://s3.eu-central-1.amazonaws.com/ekosystem-slovensko-digital-dumps/vszp.sql.gz',
     downloadTimeoutMs: 120_000, // najväčší súbor ~18 MB + pomalé linky
+    // nový zoznam s menej ako touto časťou záznamov predchádzajúceho = pravdepodobne rozbitý zdroj → ponechaj starý
+    minRetainRatio: 0.5,
   },
   disclaimer: 'Informatívny výstup z verejných registrov, nie úverový rating ani právne posúdenie.',
 } as const;
