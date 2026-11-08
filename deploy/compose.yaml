@@ -1,29 +1,29 @@
-# SK Firma na Synology NAS za DSM reverse proxy (bez Cloudflare Tunnel).
-# Postup: README.sk.md → „Nasadenie na Synology (DSM reverse proxy)".
+# SK Firma za reverse proxy (Caddy, nginx, Synology DSM…), bez Cloudflare Tunnel.
+# Proxy musí pridávať IP klienta na koniec X-Forwarded-For (TRUST_PROXY=xff).
+# Príklad pre Synology: README.sk.md → „Nasadenie na Synology (DSM reverse proxy)".
 #
-# Tok: internet → router :443 → DSM reverse proxy (HTTPS, Let's Encrypt)
-#      → http://localhost:8080 → tento kontajner
+# Tok: internet → reverse proxy (HTTPS) → http://localhost:8080 → tento kontajner
 
 services:
   skfirma:
     image: ghcr.io/carnaby/sk-firma-mcp:latest
     container_name: skfirma
     restart: unless-stopped
-    # Watchtower na NAS (repo services) sleduje len kontajnery s týmto labelom:
+    # Watchtower na serveri sleduje len kontajnery s týmto labelom:
     # nový :latest po pushi do main nasadí do ~5 min, volume s indexom ostáva.
     labels: ['com.centurylinklabs.watchtower.enable=true']
     ports:
-      # len na localhost NAS-u: dnu sa ide výhradne cez DSM reverse proxy.
+      # len na localhost hostiteľa: dnu sa ide výhradne cez reverse proxy.
       # Na 0.0.0.0 by sa dal z LAN obísť proxy aj podvrhnúť X-Forwarded-For.
       - "127.0.0.1:8080:8080"
     volumes:
       # pomenovaný volume, nie ./data — Docker mu nastaví správneho vlastníka
-      # (kontajner beží ako neprivilegovaný user), bind mount na DSM by
+      # (kontajner beží ako neprivilegovaný user), bind mount s iným vlastníkom by
       # skončil s „permission denied" pri ingeste
       - skfirma-data:/data
     environment:
       TZ: Europe/Bratislava
-      # DSM reverse proxy (nginx) pridáva IP klienta na koniec X-Forwarded-For
+      # reverse proxy (Caddy, nginx, DSM) pridáva IP klienta na koniec X-Forwarded-For
       TRUST_PROXY: xff
       # Limity — defaulty sú rozumné, odkomentuj len ak treba
       # RATE_LIMIT_API_PER_MINUTE: "20"

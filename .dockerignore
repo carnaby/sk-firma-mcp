@@ -5,3 +5,7 @@ docs
 .git
 .superpowers
 *.log
+.env
+.env.*
+*.sqlite
+*.sqlite-*

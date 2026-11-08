@@ -31,7 +31,7 @@ const intercept = (query: string, body: string, status = 200) =>
 
 describe('parseDoveraHtml', () => {
   it('dlžník: suma z item-sum (&nbsp;/&euro; entity), dátum v nominatíve („12. júl")', () => {
-    expect(parseDoveraHtml(debtorHtml, '77777777')).toEqual({ status: 'debtor', amount_eur: 54_441.19, as_of: '2026-07-12' });
+    expect(parseDoveraHtml(debtorHtml, '77777777')).toEqual({ status: 'debtor', amount_eur: 12_345.67, as_of: '2026-07-12' });
   });
 
   it('nenašli: IČO je na stránke len ako ozvena formulára → not_found, nie chyba', () => {
@@ -67,7 +67,7 @@ describe('DoveraClient', () => {
   it('nájde dlžníka', async () => {
     intercept('77777777', debtorHtml);
     const r = await new DoveraClient(new LruCache({ maxSize: 10 })).lookup('77777777');
-    expect(r).toEqual({ status: 'debtor', amount_eur: 54_441.19, as_of: '2026-07-12' });
+    expect(r).toEqual({ status: 'debtor', amount_eur: 12_345.67, as_of: '2026-07-12' });
   });
 
   it('not_found sa cachuje — druhé volanie ide z cache (jednorazový intercept)', async () => {

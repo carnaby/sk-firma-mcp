@@ -12,7 +12,7 @@ and coding agents; user docs are in [README.md](README.md) / [README.sk.md](READ
 | `packages/mcp` | MCP server (stdio + Streamable HTTP handler), tool definitions in `src/server.ts`, live smoke test |
 | `apps/server` | Hono server: static web, `/api/*`, `/mcp`, rate limits, scheduled ingest |
 | `apps/web` | React + Vite single page app |
-| `deploy/` | Docker Compose files (NAS, Cloudflare Tunnel variant) |
+| `deploy/` | Docker Compose files (behind a reverse proxy; Cloudflare Tunnel variant) |
 
 One service layer (`packages/core/src/services.ts`) produces the same verdict for the web and MCP.
 Thresholds live in `packages/core/src/config.ts`.
@@ -36,7 +36,7 @@ only after that, and the production host pulls `:latest` automatically.
 
 - **Never a false positive.** A debt or risk flag must be certain. Ambiguous name matches are
   `unverifiable`, never `debtor`. Outside the Business Register names are not unique (sole traders),
-  so FS debtor matching also needs postal code and house number.
+  so FS debtor matching also needs postal code, street and house number.
 - **Never a silent zero.** A missing or failed source is reported as unavailable and makes the
   verdict ⚪ at most; it never makes the verdict worse and never becomes "not a debtor". An empty or
   suspiciously small downloaded list keeps the previous index.

@@ -60,8 +60,14 @@ nahraď doménu svojou.
 
 ```bash
 pnpm install && pnpm build
-claude mcp add skfirma -- node /cesta/k/repu/packages/mcp/dist/bin/cli.js
+claude mcp add skfirma -e SKFIRMA_INDEX_PATH=/cesta/k/repu/data/skfirma-index.sqlite -- node /cesta/k/repu/packages/mcp/dist/bin/cli.js
 ```
+
+`skfirma_debts` a `skfirma_vat_status` potrebujú lokálny index (najprv
+`pnpm ingest`, pozri [Ingest](#ingest-lokálny-index-dlžníkov-a-platiteľov-dph)).
+Nastav absolútnu cestu `SKFIRMA_INDEX_PATH` — default
+`./data/skfirma-index.sqlite` je relatívny k pracovnému adresáru klienta,
+ktorý server spúšťa, nie k repu.
 
 Balík `sk-firma-mcp-server` zatiaľ nie je zverejnený na npm. Po
 `pnpm --filter sk-firma-mcp-server publish` bude fungovať aj
@@ -133,7 +139,9 @@ verejnú IP.
 5. **Over.** `https://skfirma.tvojadomena.sk/api/health`. Prvý ingest
    štartuje ~5 s po spustení a trvá pár minút; potom `index_available: true`.
    Logy: Container Manager → Kontajner → `skfirma` → Denník.
-   **Skontroluj `client_ip`** — musí to byť tvoja verejná IP. Ak je tam
+   **Skontroluj `client_ip`** — nastav `SKFIRMA_ADMIN_TOKEN` a zavolaj
+   `curl -H "Authorization: Bearer <token>" https://skfirma.tvojadomena.sk/api/health`
+   (server IP adresy neloguje). V odpovedi musí byť tvoja verejná IP. Ak je tam
    `172.x.x.x` (adresa proxy), limity by platili pre všetkých naraz: v
    pravidle reverse proxy → Vlastná hlavička → Vytvoriť pridaj
    `X-Forwarded-For` = `$proxy_add_x_forwarded_for`.
@@ -155,6 +163,10 @@ volume ostáva.
 - Iný server s Dockerom: `docker run -d -p 8080:8080 -v skfirma-data:/data ghcr.io/carnaby/sk-firma-mcp:latest`
   a vlastná reverse proxy (Caddy, Traefik) s `TRUST_PROXY=xff`.
 
+**Vlastná inštancia:** web obsahuje analytiku Umami autora (počíta len na
+firma.carnaby.sk) a kontakt prevádzkovateľa v sekcii „Ochrana údajov“ —
+pre vlastnú inštanciu ich zmeň v `apps/web/index.html` a `apps/web/src/App.tsx`.
+
 ### Ochrana zdrojových API
 
 Verejný web a `/mcp` znamenajú, že ktokoľvek môže cez tvoj server
@@ -168,7 +180,7 @@ posielať dopyty na RPO, RÚZ a Dôveru. Ochrana má dve úrovne:
 | Kľúč limitu, telo | obchádzaniu limitu | IPv6 sa ráta po sieti /64; JSON-RPC batch sa odmieta; telo `/mcp` max. 64 kB |
 | Cache + single-flight | opakovaným a súbežným dopytom na tú istú firmu | RPO 7 dní, RÚZ a Dôvera 1 deň |
 | Throttle na host | nárazom | ~2 req/s na RPO, RÚZ, Dôveru |
-| Max. fronta na host | zahlteniu (veľa IP naraz) | 20 čakajúcich, ďalší dostane hneď „vyťažené" (HTTP 503) |
+| Max. fronta na host | zahlteniu (veľa IP naraz) | 20 čakajúcich, ďalší dostane hneď „vyťažené" (web HTTP 503, v MCP chybová odpoveď nástroja) |
 | Denný rozpočet na host | súčtu všetkých klientov | 20 000 dopytov/deň na zdroj |
 
 Aktuálne čísla (spotreba rozpočtu, fronta, odmietnuté) ukazuje
@@ -180,6 +192,8 @@ vynuluje a pri viacerých inštanciách by ich bolo treba zdieľať (Redis).
 | `PORT` | `8080` (Docker), `8787` (lokálne) | |
 | `SKFIRMA_INDEX_PATH` | `/data/skfirma-index.sqlite` (Docker) | cesta k SQLite indexu |
 | `SKFIRMA_INGEST_INTERVAL_HOURS` | `24` | `0` = vypnutý plánovaný ingest |
+| `SKFIRMA_INDEX_STALE_DAYS` | `30` | index starší ako toľko dní (od posledného stiahnutia) → varovanie a bez rizikového signálu ⚪ |
+| `SKFIRMA_INGEST_ACCEPT_SHRINK` | — | datasety oddelené čiarkou (napr. `tax_debtors`), pri ktorých ingest prijme pokles pod 50 % predchádzajúceho počtu záznamov |
 | `TRUST_PROXY` | `none` | `cloudflare` = IP z `CF-Connecting-IP`; `xff` = posledná položka `X-Forwarded-For` (vlastná reverse proxy) |
 | `RATE_LIMIT_API_PER_MINUTE` | `20` | na IP pre `/api/check` a `/api/search` |
 | `RATE_LIMIT_API_PER_DAY` | `300` | previerky na IP za deň, spolu za web (`/api`) aj MCP (`tools/call`) |
@@ -212,8 +226,10 @@ Stiahne a spracuje 6 verejných datasetov (~50–100 MB spolu):
 | Dlžníci VšZP | Slovensko.Digital Datahub (SQL dump VšZP) |
 
 Beh je idempotentný — FS datasety používajú podmienený GET (ETag), takže
-opakovaný beh bez zmeny na strane zdroja vypíše `not_modified` a nesťahuje
-dáta znova. Výstupom je súhrnná tabuľka na stderr (dataset/stav/počet
+opakovaný beh bez zmeny na strane zdroja pri nich vypíše `not_modified` a
+nesťahuje dáta znova (SP a VšZP sa sťahujú vždy). Zlyhaný, prázdny alebo
+podozrivo malý zoznam (< 50 % predchádzajúceho počtu záznamov) sa zahodí a
+ostane posledný platný. Výstupom je súhrnná tabuľka na stderr (dataset/stav/počet
 záznamov/`as_of`) a súbor `data/skfirma-index.sqlite` (atomický swap, server
 ho pri zmene automaticky znovu otvorí bez reštartu).
 
@@ -277,10 +293,10 @@ Nájdených: 1. [RPO, ŠÚ SR, CC-BY 4.0]
 | 11111111 | Firma Jeden s. r. o. | Vzorová 123/4, 81101 Bratislava - mestská časť Staré Mesto | aktívna | 2018-01-02 |
 ```
 
-**3. „Vyhľadaj Firma Jeden, len aktívne firmy, max 5 výsledkov“**
+**3. „Vyhľadaj Firma Jeden vrátane zaniknutých, max 5 výsledkov“**
 
 ```json
-{ "name": "skfirma_search", "arguments": { "query": "Firma Jeden", "only_active": true, "limit": 5 } }
+{ "name": "skfirma_search", "arguments": { "query": "Firma Jeden", "only_active": false, "limit": 5 } }
 ```
 ```
 Nájdených: 1. [RPO, ŠÚ SR, CC-BY 4.0]
@@ -292,7 +308,7 @@ Nájdených: 1. [RPO, ŠÚ SR, CC-BY 4.0]
 
 ### `skfirma_profile` — identita firmy podľa IČO
 
-Právna forma, adresa, právny stav (aktívna/likvidácia/konkurz), štatutári,
+Právna forma, adresa, právny stav (aktívna/likvidácia/reštrukturalizácia/konkurz/zaniknutá), štatutári,
 spoločníci, SK NACE.
 
 **1. „Kto je konateľ Firma Jeden s. r. o.?“**
@@ -500,7 +516,7 @@ sú všetky štyri.
 | `young_company` | vznik pred menej ako 24 mesiacmi | 🟠 |
 | `high_leverage` | záväzky / aktíva > 90 % | 🟠 |
 | — | žiadny flag a všetky kľúčové sekcie k dispozícii | 🟢 |
-| — | žiadny flag, ale kľúčová sekcia chýba (financie len v PDF/IFRS, register neodpovedal, chýba lokálny index, FS dlh sa nedá priradiť, sekcia nevyžiadaná) | ⚪ |
+| — | žiadny flag, ale kľúčová sekcia chýba (financie len v PDF/IFRS alebo v nepodporovanej šablóne, v RÚZ nie je použiteľná závierka, register neodpovedal, chýba alebo je starý lokálny index, FS dlh sa nedá priradiť, sekcia nevyžiadaná) | ⚪ |
 
 Riziko a úplnosť dát sú dve osi: **neúplnosť dát nie je riziko**. Chýbajúci
 zdroj nikdy nezhorší verdikt na 🟠/🔴 — pri zistenom signáli je neúplnosť len
@@ -574,9 +590,8 @@ hodnoty (tržby, ID výkazov, dátum `as_of`) sa pri reálnom subjekte menia.
 ## Čo server NEvie (limitácie)
 
 - **Konkurz/reštrukturalizácia detailne** (priebeh konania, veritelia,
-  termíny) — v MVP je viditeľný len právny stav z RPO (áno/nie + dátum
-  od kedy), podrobný zdroj z Insolvenčného registra REPLIK je v pláne na
-  v1.1.
+  termíny) — viditeľný je len právny stav z RPO (áno/nie + dátum
+  od kedy), podrobný zdroj z Insolvenčného registra REPLIK je v pláne.
 - **Firmy účtujúce podľa IFRS** — register poskytuje len PDF verzie
   závierok, štruktúrované metriky (tržby/VH/vlastné imanie) pre ne nie sú
   dostupné; nástroj to vráti ako explicitný `unavailable_reason` (nikdy
@@ -584,12 +599,12 @@ hodnoty (tržby, ID výkazov, dátum `as_of`) sa pri reálnom subjekte menia.
   za posledné 2 roky — staršie cez parameter `years`.
 - **Živnostníci s jednoduchým účtovníctvom (JÚ)** — ich výkazy majú iné
   metriky (chýba vlastné imanie aj výsledok hospodárenia v porovnateľnej
-  forme) a nie sú v MVP mapované; plánované na v1.1.
+  forme) a zatiaľ nie sú mapované.
 - Žiadne ML skórovanie ani predikcie — iba deterministické pravidlá nad
   overiteľnými faktami z registrov.
 - **Union** — nemá verejný export dlžníkov, `skfirma_debts` ho vždy vráti ako
   `not_supported`; plán je nejasný (závisí od dostupnosti dát).
-- **Dôvera** — nemá API, ide o krehký HTML scraping jednej stránky (S4).
+- **Dôvera** — nemá API, ide o krehký HTML scraping jednej stránky.
   Výpadok, rate-limit alebo Cloudflare challenge = `unavailable` s
   `retryable: true`; zmena HTML = `parse_error` (do logu ide úryvok HTML).
   Nikdy tichá nula ani výnimka smerom k volajúcemu.
@@ -598,7 +613,7 @@ hodnoty (tržby, ID výkazov, dátum `as_of`) sa pri reálnom subjekte menia.
   `high` = zhoda len obce); pri nejednoznačnej zhode vráti `unverifiable`,
   nikdy neriskuje false positive priradenie dlhu cudziemu subjektu. Mimo
   obchodného registra (živnostníci, združenia) meno nie je jedinečné, preto
-  sa vyžaduje zhoda PSČ aj čísla domu.
+  sa vyžaduje zhoda PSČ, ulice aj čísla domu.
 - **Prahy zverejnenia zoznamov dlžníkov** — FS zverejňuje dlh len nad 170 €,
   Sociálna poisťovňa od 5 €, zdravotné poisťovne nad 100 €; nižšie dlhy sa
   v zdrojových zoznamoch vôbec nenachádzajú (nie je to chyba nástroja).
@@ -615,7 +630,7 @@ hodnoty (tržby, ID výkazov, dátum `as_of`) sa pri reálnom subjekte menia.
 | Zdroj | Poskytovateľ | Licencia | Čo prináša |
 |---|---|---|---|
 | **RPO** (Register právnických osôb) | Štatistický úrad SR, `api.statistics.sk/rpo/v1` | CC-BY 4.0 | identita, adresa, právny stav, štatutári, spoločníci, SK NACE |
-| **RÚZ** (Register účtovných závierok) | Ministerstvo financií SR, `registeruz.sk/cruz-public/api` | verejné dáta (CC0) | tržby, výsledok hospodárenia, vlastné imanie, aktíva/pasíva |
+| **RÚZ** (Register účtovných závierok) | Ministerstvo financií SR, `registeruz.sk/cruz-public/api` | verejné dáta | tržby, výsledok hospodárenia, vlastné imanie, aktíva/pasíva |
 | **FS OpenData** (Finančná správa SR) | `report.financnasprava.sk` (ZIP export) | verejné dáta | platitelia DPH, rizikoví platitelia (aj vymazaní z tohto zoznamu), daňoví dlžníci |
 | **Sociálna poisťovňa** | `socpoist.sk`, verejný zoznam dlžníkov | verejné dáta | dlžníci SP |
 | **VšZP** | Slovensko.Digital **Datahub** (SQL dump), pôvodný zdroj VšZP | verejné dáta | dlžníci VšZP |

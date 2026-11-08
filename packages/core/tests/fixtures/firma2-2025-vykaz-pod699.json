@@ -11,7 +11,7 @@
     },
     {
       "id": 9010202,
-      "meno": "POD_2222222222_IR_202404-202503_9010301_9010302.pdf",
+      "meno": "POD_2222222222_IR_202407-202506_9010301_9010302.pdf",
       "mimeType": "application/pdf",
       "velkostPrilohy": 314000,
       "pocetStran": 12,
@@ -624,23 +624,23 @@
       "adresa": {
         "ulica": "Vzorová",
         "cislo": "8",
-        "psc": "03601",
-        "mesto": "MARTIN"
+        "psc": "04001",
+        "mesto": "KOŠICE"
       },
-      "skNace": "47610",
+      "skNace": "46900",
       "typZavierky": "Riadna",
-      "obdobieOd": "2024-04",
-      "obdobieDo": "2025-03",
-      "predchadzajuceObdobieOd": "2023-04",
-      "predchadzajuceObdobieDo": "2024-03",
-      "datumSchvalenia": "2025-09-22",
-      "datumZostavenia": "2025-09-12",
-      "oznacenieObchodnehoRegistra": "Okresný súd Žilina, oddiel Sro, vložka č. 100002/L"
+      "obdobieOd": "2024-07",
+      "obdobieDo": "2025-06",
+      "predchadzajuceObdobieOd": "2023-07",
+      "predchadzajuceObdobieDo": "2024-06",
+      "datumSchvalenia": "2025-11-14",
+      "datumZostavenia": "2025-10-20",
+      "oznacenieObchodnehoRegistra": "Okresný súd Košice I, oddiel Sro, vložka č. 100002/V"
     }
   },
   "pristupnostDat": "Verejné",
   "zdrojDat": "FRSR",
-  "datumPoslednejUpravy": "2025-09-30",
-  "kodDanovehoUradu": "500",
+  "datumPoslednejUpravy": "2025-11-24",
+  "kodDanovehoUradu": "700",
   "idSablony": 699
 }

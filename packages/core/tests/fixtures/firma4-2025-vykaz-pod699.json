@@ -624,22 +624,22 @@
       "adresa": {
         "ulica": "Vzorová",
         "cislo": "14",
-        "psc": "82109",
+        "psc": "82101",
         "mesto": "BRATISLAVA"
       },
-      "skNace": "82990",
+      "skNace": "70220",
       "typZavierky": "Riadna",
       "obdobieOd": "2025-01",
       "obdobieDo": "2025-12",
       "predchadzajuceObdobieOd": "2024-01",
       "predchadzajuceObdobieDo": "2024-12",
-      "datumZostavenia": "2026-06-26",
+      "datumZostavenia": "2026-05-11",
       "oznacenieObchodnehoRegistra": "Spol.je zapísaná v OR Mest. súdu BA III, odd. Sro, vl. č. 100004/B"
     }
   },
   "pristupnostDat": "Verejné",
   "idSablony": 699,
   "kodDanovehoUradu": "100",
-  "datumPoslednejUpravy": "2026-07-02",
+  "datumPoslednejUpravy": "2026-05-29",
   "zdrojDat": "FRSR"
 }

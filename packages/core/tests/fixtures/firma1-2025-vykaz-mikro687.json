@@ -221,19 +221,19 @@
         "psc": "81101",
         "mesto": "Bratislava"
       },
-      "skNace": "62010",
+      "skNace": "62020",
       "typZavierky": "Riadna",
       "obdobieOd": "2025-01",
       "obdobieDo": "2025-12",
       "predchadzajuceObdobieOd": "2024-01",
       "predchadzajuceObdobieDo": "2024-12",
-      "datumZostavenia": "2026-06-26",
+      "datumZostavenia": "2026-03-18",
       "oznacenieObchodnehoRegistra": "OR OS Bratislava I, oddiel Sro, vložka 100001/B"
     }
   },
   "pristupnostDat": "Verejné",
   "idSablony": 687,
   "kodDanovehoUradu": "100",
-  "datumPoslednejUpravy": "2026-07-06",
+  "datumPoslednejUpravy": "2026-04-02",
   "zdrojDat": "FRSR"
 }

@@ -47,11 +47,13 @@ The endpoint is stateless Streamable HTTP without authentication.
 
 ```bash
 pnpm install && pnpm build
-claude mcp add skfirma -- node /path/to/repo/packages/mcp/dist/bin/cli.js
+claude mcp add skfirma -e SKFIRMA_INDEX_PATH=/path/to/repo/data/skfirma-index.sqlite -- node /path/to/repo/packages/mcp/dist/bin/cli.js
 ```
 
 `skfirma_debts` and `skfirma_vat_status` need the local index — run
-`pnpm ingest` first (see [Data index](#data-index)). The npm package
+`pnpm ingest` first (see [Data index](#data-index)). Use an absolute
+`SKFIRMA_INDEX_PATH`: the default `./data/skfirma-index.sqlite` is relative to
+the working directory of the client that starts the server, not to the repo. The npm package
 `sk-firma-mcp-server` is not published yet.
 
 ## Tools
@@ -63,7 +65,7 @@ or `json`.
 |---|---|
 | `skfirma_check` | **Main tool.** Full check in one call: identity, 3 years of financials, debts, VAT status and the verdict with reasons. Takes `ico` or `name`; an ambiguous name returns candidates instead of guessing. |
 | `skfirma_search` | Find a company by name or IČO (disambiguation). |
-| `skfirma_profile` | Legal form, address, status (active / in liquidation / bankrupt / dissolved), statutory bodies, shareholders, main activity (SK NACE). |
+| `skfirma_profile` | Legal form, address, status (active / in liquidation / in restructuring / bankrupt / dissolved), statutory bodies, shareholders, main activity (SK NACE). |
 | `skfirma_financials` | Revenue, profit, equity, debt ratio and YoY revenue change from financial statements — derived metrics, not raw statements. For IFRS reporters (PDF only) it returns working links to the PDF attachments with year, type and size. |
 | `skfirma_debts` | Debtor status and amounts: Financial Administration (tax), Social Insurance Agency, health insurers VšZP and Dôvera. |
 | `skfirma_vat_status` | VAT registration, risky VAT payers (§52/6) and past entries on that list (removed payers). Accepts `ico` or `ic_dph`. |
@@ -106,7 +108,7 @@ Worst-of over the flags below; no weights, no score. Thresholds live in
 | `young_company` | younger than 24 months | 🟠 |
 | `high_leverage` | liabilities / assets > 90 % | 🟠 |
 | — | no flag, all key sections available | 🟢 |
-| — | no flag, but a key section is missing (financials only as PDF/IFRS, a register didn't respond, no local index, tax debt can't be matched, section not requested) | ⚪ |
+| — | no flag, but a key section is missing (financials only as PDF/IFRS or in an unsupported template, no usable statement in RÚZ, a register didn't respond, missing or stale local index, tax debt can't be matched, section not requested) | ⚪ |
 
 Risk and data completeness are two separate axes — **incomplete data is not
 a risk**. A missing source never makes the verdict worse: with a risk signal
@@ -145,7 +147,7 @@ always reported as unavailable.
 - **Tax debtors list has no IČO** — matching is by normalized name and
   address; ambiguous matches are reported as unverifiable, never assigned.
   Outside the Business Register (sole traders, associations) names are not
-  unique, so a match also requires the same postal code and house number.
+  unique, so a match also requires the same postal code, street and house number.
 - **Publication thresholds and delays:** the tax office publishes debts
   over €170 with a lag of weeks, Social Insurance from €5, health insurers
   over €100. Every value carries its `as_of` date.
@@ -183,6 +185,10 @@ a daily request budget per source and a single-flight cache, so the server
 can't be used to flood the government APIs. All limits are configurable
 via environment variables (table in the Slovak README).
 
+The web build includes the author's Umami analytics tag (it counts only on
+firma.carnaby.sk) and the operator's contact details in the privacy section;
+change `apps/web/index.html` and `apps/web/src/App.tsx` for your own instance.
+
 | Endpoint | |
 |---|---|
 | `GET /` | website |
@@ -197,9 +203,10 @@ via environment variables (table in the Slovak README).
 pnpm build && pnpm ingest   # from the repo root → ./data/skfirma-index.sqlite
 ```
 
-Downloads six public datasets (tens of MB), uses conditional GET where the
-source supports it and swaps the index atomically. A dataset that fails to
-download keeps its last good snapshot.
+Downloads six public datasets (~50–100 MB in total), uses conditional GET
+where the source supports it and swaps the index atomically. A dataset that
+fails to download, or comes back empty or with less than half of the previous
+record count, keeps its last good snapshot.
 
 ## Development
 
